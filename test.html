@@ -429,8 +429,9 @@
       <div class="penalty-dialog">
         <h2 id="penaltyTitle">Atención</h2>
         <p id="penaltyMessage"></p>
+        <p class="penalty-total hidden" id="penaltyTotal"></p>
         <p class="penalty-countdown" id="penaltyCountdown"></p>
-        <p class="penalty-warning" id="penaltyWarning">Si vuelves a salir de la pantalla, el intento se bloqueará definitivamente.</p>
+        <p class="penalty-warning hidden" id="penaltyWarning"></p>
       </div>
     </div>
 
@@ -451,6 +452,9 @@
       const penaltyOverlay = document.getElementById('penaltyOverlay');
       const penaltyMessage = document.getElementById('penaltyMessage');
       const penaltyCountdown = document.getElementById('penaltyCountdown');
+      const penaltyTotal = document.getElementById('penaltyTotal');
+      const penaltyWarning = document.getElementById('penaltyWarning');
+      const penaltyWarningDefault = penaltyWarning ? penaltyWarning.textContent : '';
 
       const sessionStorageKey = quizId ? `quizSession:${quizId}` : '';
       let sesionToken = '';
@@ -473,7 +477,15 @@
       let estudiantesDisponibles = [];
       let alumnoSeleccionado = null;
       let duracionCuestionarioMs = 0;
-      let idIntento = null; // Añadido para guardar el ID del intento
+      let penalizacionActiva = false;
+      let penalizacionIntervalId = null;
+      let penalizacionFinTimestamp = null;
+      let penalizacionTotalMs = 0;
+      let penalizacionAcumuladaMs = 0;
+      let escapePolicy = null;
+      let escapesRegistrados = 0;
+      let advertenciasRestantes = null;
+      let escapeRegistroEnCurso = false;
 
       function configurarSelectorEstudiantes(estudiantes, alumnoPreseleccionado, cursoFiltro) {
         estudiantesDisponibles = Array.isArray(estudiantes) ? estudiantes.slice() : [];
@@ -594,8 +606,6 @@
         return;
       }
 
-      idIntento = state.idIntento; // Guardar el ID del intento
-
       // Mover la lógica de escape aquí para que se inicialice después de cargar la configuración
       window.quizConfig = state.quiz;
       
@@ -614,6 +624,10 @@
       
       const duracionMin = typeof quiz.duracionMin !== 'undefined' ? Number(quiz.duracionMin) : 0;
       duracionCuestionarioMs = Math.max(0, duracionMin) * 60 * 1000;
+      escapePolicy = state.escapePolicy || normalizarEscapePolicy(quiz.escapeConfig, state.tiempoTotalMs || duracionCuestionarioMs);
+      escapesRegistrados = Number(state.salidasRegistradas || 0);
+      penalizacionAcumuladaMs = Number(state.penalizacionAcumuladaMs || 0);
+      actualizarAdvertenciasRestantes(calcularAdvertenciasRestantes());
 
       preguntasDefinidas = preguntas;
       renderPreguntas(preguntasDefinidas);
@@ -649,42 +663,67 @@
     }
 
       function handleVisibilityChange() {
-        if (!idIntento) return; // No hacer nada si no tenemos un intento
+        if (!quizId || intentoBloqueado) {
+          return;
+        }
 
-        if (document.visibilityState === "hidden") {
-          // El usuario ha cambiado a otra pestaña o minimizado la ventana.
-          // Solo notificamos al servidor, sin esperar una respuesta compleja.
-          console.log("El usuario ha salido del quiz. Registrando escape...");
+        if (document.visibilityState === 'hidden') {
+          if (escapeRegistroEnCurso) {
+            return;
+          }
+
+          escapeRegistroEnCurso = true;
+          console.log('El usuario ha salido del quiz. Registrando escape...');
           google.script.run
-            .withFailureHandler(function(error) {
-              console.error("Error al registrar el escape:", error);
+            .withSuccessHandler(function(respuesta) {
+              escapeRegistroEnCurso = false;
+              procesarRespuestaEscape(respuesta);
             })
-            .registrarEscape(idIntento);
-        } else {
-          // El usuario ha vuelto a la pestaña del quiz.
-          // Re-sincronizamos el estado con el servidor para obtener el tiempo restante actualizado.
-          console.log("El usuario ha vuelto al quiz. Sincronizando estado...");
+            .withFailureHandler(function(error) {
+              escapeRegistroEnCurso = false;
+              console.error('Error al registrar el escape:', error);
+            })
+            .registrarEscape(quizId, 'Se detectó una salida de la pantalla.', sesionToken);
+        } else if (document.visibilityState === 'visible') {
+          if (escapeRegistroEnCurso) {
+            return;
+          }
+          console.log('El usuario ha vuelto al quiz. Sincronizando estado...');
           google.script.run
             .withSuccessHandler(function(estado) {
               if (estado.bloqueado) {
-                mostrarMensajeBloqueo(estado.mensajeBloqueo);
+                mostrarMensajeBloqueo(estado.motivo || 'El intento ha sido bloqueado.');
                 return;
               }
-              // Actualizamos el tiempo restante con el valor del servidor y reiniciamos el contador.
-              console.log("Estado sincronizado. Tiempo restante:", estado.tiempoRestanteMs);
-              tiempoRestanteMs = estado.tiempoRestanteMs;
-              iniciarTemporizador(); // Reinicia el contador con el nuevo tiempo
+              if (estado.escapePolicy) {
+                escapePolicy = estado.escapePolicy;
+              }
+              if (typeof estado.salidasRegistradas === 'number') {
+                escapesRegistrados = estado.salidasRegistradas;
+              }
+              if (typeof estado.penalizacionAcumuladaMs === 'number') {
+                penalizacionAcumuladaMs = estado.penalizacionAcumuladaMs;
+              }
+              actualizarAdvertenciasRestantes(calcularAdvertenciasRestantes());
+              if (typeof estado.tiempoTotalMs === 'number') {
+                tiempoTotalMs = estado.tiempoTotalMs;
+              }
+              if (typeof estado.tiempoRestanteMs === 'number') {
+                tiempoRestanteMs = estado.tiempoRestanteMs;
+                iniciarTemporizador();
+              }
             })
             .withFailureHandler(function(error) {
-              console.error("Error al re-sincronizar el estado:", error);
-              mostrarError("Error de comunicación con el servidor al volver al quiz.");
+              console.error('Error al re-sincronizar el estado:', error);
+              mostrarMensaje('Error de comunicación con el servidor al volver al quiz.', false, true);
             })
-            .obtenerEstado(quizId, sesionToken); // Usamos el token de sesión actual
+            .obtenerEstado(quizId, sesionToken);
         }
       }
 
       function mostrarMensajeBloqueo(mensaje) {
         detenerTemporizador();
+        intentoBloqueado = true;
         form.classList.add('hidden');
         statusBox.classList.remove('success');
         statusBox.innerHTML = `<strong>Intento bloqueado.</strong><br>${mensaje}`;
@@ -876,8 +915,12 @@
         const mensaje = motivo || 'Bloqueo del intento';
         try {
           google.script.run
-            .withSuccessHandler(() => {
-              bloquear(mensaje);
+            .withSuccessHandler(respuesta => {
+              if (respuesta && respuesta.mensaje) {
+                bloquear(respuesta.mensaje);
+              } else {
+                bloquear(mensaje);
+              }
             })
             .withFailureHandler(() => {
               bloquear(mensaje);
@@ -966,7 +1009,7 @@
       function normalizarEscapePolicy(rawConfig, referenciaMs) {
         // Política por defecto: PENALIZACIÓN
         const baseAccion = (rawConfig && rawConfig.accion ? rawConfig.accion : 'PENALIZACION').toString().toUpperCase();
-        
+
         // Calcular número máximo de salidas permitidas
         let maxSalidas = Math.max(1, Number(rawConfig && rawConfig.maxSalidas) || (baseAccion === 'BLOQUEO' ? 1 : 3));
         if (baseAccion === 'BLOQUEO') {
@@ -1002,6 +1045,47 @@
           descripcion,
           maxSalidas,
         };
+      }
+
+      function calcularAdvertenciasRestantes() {
+        if (!escapePolicy || typeof escapePolicy.maxSalidas !== 'number') {
+          return null;
+        }
+        const max = Math.max(0, Number(escapePolicy.maxSalidas) || 0);
+        return Math.max(0, max - Math.max(0, Number(escapesRegistrados) || 0));
+      }
+
+      function actualizarAdvertenciasRestantes(restantes) {
+        if (typeof restantes === 'number' && isFinite(restantes)) {
+          advertenciasRestantes = Math.max(0, Math.floor(restantes));
+        } else {
+          advertenciasRestantes = calcularAdvertenciasRestantes();
+        }
+
+        if (!penaltyWarning) {
+          return;
+        }
+
+        if (typeof advertenciasRestantes === 'number') {
+          if (advertenciasRestantes <= 0) {
+            penaltyWarning.textContent = 'La próxima salida bloqueará el intento.';
+            penaltyWarning.classList.remove('hidden');
+          } else {
+            penaltyWarning.textContent = advertenciasRestantes === 1
+              ? 'Tienes 1 oportunidad restante antes del bloqueo.'
+              : `Tienes ${advertenciasRestantes} oportunidades restantes antes del bloqueo.`;
+            penaltyWarning.classList.remove('hidden');
+          }
+        } else if (escapePolicy && escapePolicy.accion === 'BLOQUEO') {
+          penaltyWarning.textContent = 'La próxima salida bloqueará el intento.';
+          penaltyWarning.classList.remove('hidden');
+        } else if (penaltyWarningDefault) {
+          penaltyWarning.textContent = penaltyWarningDefault;
+          penaltyWarning.classList.toggle('hidden', !penaltyWarningDefault.trim());
+        } else {
+          penaltyWarning.textContent = '';
+          penaltyWarning.classList.add('hidden');
+        }
       }
 
       function mezclarOpciones(lista) {
@@ -1046,54 +1130,103 @@
         notif.className = 'penalty-notification';
         notif.textContent = mensaje;
         document.body.appendChild(notif);
-        
+
         setTimeout(() => {
           notif.style.animation = 'slideIn 0.3s ease-out reverse';
           setTimeout(() => notif.remove(), 300);
         }, duracionMs);
       }
 
-      function actualizarMensajePenalizacion(restanteMs) {
+      function procesarRespuestaEscape(respuesta) {
+        if (!respuesta) {
+          return;
+        }
+
+        if (respuesta.escapePolicy) {
+          escapePolicy = respuesta.escapePolicy;
+        } else if (typeof respuesta.maxSalidas === 'number') {
+          escapePolicy = Object.assign({}, escapePolicy || {}, {
+            maxSalidas: respuesta.maxSalidas,
+          });
+          if (typeof respuesta.penalizacionMs === 'number') {
+            escapePolicy.penalizacionMs = respuesta.penalizacionMs;
+          }
+        }
+
+        if (typeof respuesta.salidas === 'number') {
+          escapesRegistrados = respuesta.salidas;
+        }
+
+        if (typeof respuesta.penalizacionAcumuladaMs === 'number') {
+          penalizacionAcumuladaMs = respuesta.penalizacionAcumuladaMs;
+        }
+
+        const restantes = typeof respuesta.advertenciasRestantes === 'number'
+          ? respuesta.advertenciasRestantes
+          : calcularAdvertenciasRestantes();
+        actualizarAdvertenciasRestantes(restantes);
+
+        if (respuesta.bloqueado) {
+          bloquear(respuesta.mensaje || 'El intento ha sido bloqueado.');
+          return;
+        }
+
+        if (respuesta.accion === 'PENALIZACION' && respuesta.penalizacionMs > 0) {
+          aplicarPenalizacionTemporal(respuesta.penalizacionMs, {
+            mensaje: respuesta.mensaje || 'Se detectó una salida de la pantalla.',
+            advertenciasRestantes: restantes,
+            acumuladoMs: respuesta.penalizacionAcumuladaMs,
+          });
+          if (respuesta.mensaje) {
+            mostrarNotificacionPenalizacion(respuesta.mensaje);
+          }
+        } else if (respuesta.accion === 'ADVERTENCIA') {
+          if (respuesta.mensaje) {
+            mostrarNotificacionPenalizacion(respuesta.mensaje);
+          }
+        } else if (respuesta.mensaje && respuesta.accion === 'SIN_CAMBIO') {
+          mostrarNotificacionPenalizacion(respuesta.mensaje);
+        }
+      }
+
+      function actualizarMensajePenalizacion(restanteMs, opciones = {}) {
         const totalTexto = formatearDuracion(penalizacionTotalMs);
+        const acumuladoTexto = formatearDuracion(penalizacionAcumuladaMs);
         const restanteTexto = formatearDuracion(Math.max(0, restanteMs));
-        
-        // Crear o actualizar el contenedor del temporizador
+
         let timerContainer = document.querySelector('.timer-container');
         if (!timerContainer) {
           timerContainer = document.createElement('div');
           timerContainer.className = 'timer-container';
           form.insertBefore(timerContainer, form.firstChild);
         }
-        
-        // Actualizar el contenido del temporizador
+
         timerContainer.innerHTML = `
           <div class="timer-label">Penalización actual:</div>
           <div class="penalty-time">${restanteTexto}</div>
-          <div class="timer-label">Total acumulado:</div>
-          <div class="penalty-time">${totalTexto}</div>
+          <div class="timer-label">Tiempo total penalizado:</div>
+          <div class="penalty-time">${acumuladoTexto}</div>
         `;
 
-        // Actualizar el overlay de penalización
-        const overlay = document.createElement('div');
-        overlay.className = 'penalty-overlay';
-        overlay.id = 'penaltyOverlay';
-        
-        const dialog = document.createElement('div');
-        dialog.className = 'penalty-dialog';
-        dialog.innerHTML = `
-          <h2>Penalización por Salida</h2>
-          <p>Se ha detectado que ha salido del cuestionario.</p>
-          <p>Se aplicará una penalización temporal.</p>
-          <div class="penalty-total">
-            Tiempo de penalización: ${totalTexto}
-            <br>
-            <span class="penalty-countdown">Tiempo restante: ${restanteTexto}</span>
-          </div>
-          <button class="warning-btn" onclick="this.closest('.penalty-overlay').remove()">Entendido</button>
-        `;
-        
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        if (penaltyOverlay) {
+          penaltyOverlay.classList.remove('hidden');
+          penaltyOverlay.removeAttribute('aria-hidden');
+        }
+
+        if (penaltyMessage) {
+          penaltyMessage.textContent = opciones.mensaje || 'Se aplicará una penalización temporal.';
+        }
+
+        if (penaltyTotal) {
+          penaltyTotal.textContent = `Penalización actual: ${totalTexto}\nAcumulado: ${acumuladoTexto}`;
+          penaltyTotal.classList.remove('hidden');
+        }
+
+        if (penaltyCountdown) {
+          penaltyCountdown.textContent = `Tiempo restante: ${restanteTexto}`;
+        }
+
+        actualizarAdvertenciasRestantes(opciones.advertenciasRestantes);
       }
 
       function detenerPenalizacionTemporal(opciones = {}) {
@@ -1108,9 +1241,20 @@
         penalizacionFinTimestamp = null;
         penalizacionTotalMs = 0;
 
-        penaltyOverlay.classList.add('hidden');
-        penaltyMessage.textContent = '';
-        penaltyCountdown.textContent = '';
+        if (penaltyOverlay) {
+          penaltyOverlay.classList.add('hidden');
+          penaltyOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (penaltyMessage) {
+          penaltyMessage.textContent = '';
+        }
+        if (penaltyCountdown) {
+          penaltyCountdown.textContent = '';
+        }
+        if (penaltyTotal) {
+          penaltyTotal.textContent = '';
+          penaltyTotal.classList.add('hidden');
+        }
 
         if (restaurarControles) {
           setFormTemporalDisabled(false);
@@ -1120,29 +1264,43 @@
           });
         }
 
+        actualizarAdvertenciasRestantes(calcularAdvertenciasRestantes());
+
         if (estabaActiva && mostrarFin && !intentoBloqueado) {
           mostrarMensaje('Penalización finalizada. Si vuelves a abandonar la pantalla, el intento se bloqueará.', false, true);
         }
       }
 
-      function aplicarPenalizacionTemporal() {
+      function aplicarPenalizacionTemporal(duracionMs, opciones = {}) {
         if (penalizacionActiva || intentoBloqueado) {
           return;
         }
-        salidaAdvertida = true;
 
-        const baseTotal = duracionCuestionarioMs && duracionCuestionarioMs > 0 ? duracionCuestionarioMs : 10 * 60 * 1000;
-        let penalizacionMs = Math.max(1000, Math.round(baseTotal * 0.1));
+        const referenciaBase = Number(duracionMs);
+        const referenciaDisponible = duracionCuestionarioMs && duracionCuestionarioMs > 0
+          ? duracionCuestionarioMs
+          : 10 * 60 * 1000;
+        let penalizacionMs = isFinite(referenciaBase) && referenciaBase > 0
+          ? referenciaBase
+          : calcularPenalizacionPorDefecto(referenciaDisponible);
+
         if (typeof tiempoRestanteMs === 'number' && tiempoRestanteMs > 0) {
           penalizacionMs = Math.min(penalizacionMs, Math.max(1000, tiempoRestanteMs));
         }
 
+        penalizacionMs = Math.max(1000, Math.round(penalizacionMs));
+
         penalizacionActiva = true;
         penalizacionTotalMs = penalizacionMs;
+        if (typeof opciones.acumuladoMs === 'number' && opciones.acumuladoMs >= 0) {
+          penalizacionAcumuladaMs = opciones.acumuladoMs;
+        } else {
+          penalizacionAcumuladaMs += penalizacionMs;
+        }
         penalizacionFinTimestamp = Date.now() + penalizacionMs;
 
         setFormTemporalDisabled(true);
-        actualizarMensajePenalizacion(penalizacionMs);
+        actualizarMensajePenalizacion(penalizacionMs, opciones);
 
         if (penalizacionIntervalId) {
           clearInterval(penalizacionIntervalId);
@@ -1153,7 +1311,7 @@
             detenerPenalizacionTemporal({ restaurarControles: true, mostrarFin: true });
             return;
           }
-          actualizarMensajePenalizacion(restante);
+          actualizarMensajePenalizacion(restante, opciones);
         }, 250);
       }
 

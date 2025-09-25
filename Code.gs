@@ -364,6 +364,7 @@ function obtenerEstado(quizId, clientToken) {
   let match = findAttemptRow(attemptsSheet, email, quizId);
   const now = new Date();
   const limitMs = quiz.duracionMin > 0 ? quiz.duracionMin * 60 * 1000 : null;
+  const escapePolicy = normalizeEscapePolicy(quiz.escapeConfig, limitMs);
   const normalizedToken = clientToken ? clientToken.toString().trim() : '';
 
   if (!match) {
@@ -392,11 +393,15 @@ function obtenerEstado(quizId, clientToken) {
       bloqueado: false,
       quiz,
       tiempoRestanteMs: limitMs,
+      tiempoTotalMs: limitMs,
       estudiantes,
       alumnoId: '',
       alumnoNombre: '',
       alumnoCurso: '',
       sesionToken: generatedToken,
+      salidasRegistradas: 0,
+      penalizacionAcumuladaMs: 0,
+      escapePolicy,
     };
   }
 
@@ -413,6 +418,9 @@ function obtenerEstado(quizId, clientToken) {
       alumnoNombre: match.alumnoNombre || '',
       alumnoCurso: match.alumnoCurso || '',
       sesionToken: '',
+      salidasRegistradas: match.salidas || 0,
+      penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+      escapePolicy,
     };
   }
 
@@ -426,6 +434,9 @@ function obtenerEstado(quizId, clientToken) {
       alumnoNombre: match.alumnoNombre || '',
       alumnoCurso: match.alumnoCurso || '',
       sesionToken: '',
+      salidasRegistradas: match.salidas || 0,
+      penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+      escapePolicy,
     };
   }
 
@@ -451,6 +462,9 @@ function obtenerEstado(quizId, clientToken) {
         alumnoNombre: match.alumnoNombre || '',
         alumnoCurso: match.alumnoCurso || '',
         sesionToken: '',
+        salidasRegistradas: match.salidas || 0,
+        penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+        escapePolicy,
       };
     }
 
@@ -475,6 +489,9 @@ function obtenerEstado(quizId, clientToken) {
         alumnoNombre: match.alumnoNombre || '',
         alumnoCurso: match.alumnoCurso || '',
         sesionToken: '',
+        salidasRegistradas: match.salidas || 0,
+        penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+        escapePolicy,
       };
     }
   }
@@ -520,6 +537,9 @@ function obtenerEstado(quizId, clientToken) {
         alumnoNombre: match.alumnoNombre || '',
         alumnoCurso: match.alumnoCurso || '',
         sesionToken: '',
+        salidasRegistradas: match.salidas || 0,
+        penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+        escapePolicy,
       };
     }
     return {
@@ -527,11 +547,15 @@ function obtenerEstado(quizId, clientToken) {
       bloqueado: false,
       quiz,
       tiempoRestanteMs: restante,
+      tiempoTotalMs: limitMs,
       estudiantes,
       alumnoId: match.alumnoId || '',
       alumnoNombre: match.alumnoNombre || '',
       alumnoCurso: match.alumnoCurso || '',
       sesionToken: activeToken,
+      salidasRegistradas: match.salidas || 0,
+      penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+      escapePolicy,
     };
   }
 
@@ -540,11 +564,15 @@ function obtenerEstado(quizId, clientToken) {
     bloqueado: false,
     quiz,
     tiempoRestanteMs: null,
+    tiempoTotalMs: null,
     estudiantes,
     alumnoId: match.alumnoId || '',
     alumnoNombre: match.alumnoNombre || '',
     alumnoCurso: match.alumnoCurso || '',
     sesionToken: activeToken,
+    salidasRegistradas: match.salidas || 0,
+    penalizacionAcumuladaMs: match.penalizacionAcumuladaMs || 0,
+    escapePolicy,
   };
 }
 
@@ -710,24 +738,36 @@ function guardarRespuestas(quizId, respuestas, tiempoEmpleadoMs, alumnoId, clien
 }
 
 function registrarEscape(quizId, motivo, clientToken) {
+  const fallback = {
+    bloqueado: true,
+    mensaje: motivo || 'Intento bloqueado por salida de la pantalla.',
+  };
+
   if (!quizId) {
-    return;
+    return fallback;
   }
 
   const email = Session.getActiveUser().getEmail();
   if (!email) {
-    return;
+    return fallback;
+  }
+
+  const quiz = getQuizConfig(quizId);
+  if (!quiz) {
+    return fallback;
   }
 
   const attemptsSheet = ensureSheet(SHEETS.INTENTOS, HEADERS[SHEETS.INTENTOS]);
   const match = findAttemptRow(attemptsSheet, email, quizId);
-  const nota = motivo || 'Intento bloqueado';
   const now = new Date();
   const normalizedToken = clientToken ? clientToken.toString().trim() : '';
+  const limitMs = quiz.duracionMin > 0 ? quiz.duracionMin * 60 * 1000 : null;
+  const policy = normalizeEscapePolicy(quiz.escapeConfig, limitMs);
+  const notaBase = motivo || 'Se detectó una salida de la pantalla.';
 
   if (!match) {
     const noteValue = composeAttemptNoteCell({
-      mensaje: nota,
+      mensaje: notaBase,
       token: normalizedToken,
       bloqueo: 'ESCAPE',
     });
@@ -742,40 +782,111 @@ function registrarEscape(quizId, motivo, clientToken) {
       '',
       '',
       '',
+      1,
+      0,
     ]);
-    return;
+    return {
+      bloqueado: true,
+      mensaje: notaBase,
+      salidas: 1,
+      maxSalidas: policy.maxSalidas,
+      accion: 'BLOQUEO',
+    };
   }
 
-  if (match.status === STATUS.EN_CURSO) {
-    const attemptToken = match.note.token || '';
-    if (attemptToken && normalizedToken && attemptToken !== normalizedToken) {
-      lockAttempt(
-        attemptsSheet,
-        match.row,
-        STATUS.BLOQUEADO,
-        'Se detectó otro acceso con esta cuenta.',
-        now,
-        {
-          token: attemptToken,
-          bloqueo: 'DUPLICADO',
-        },
-      );
-      return;
-    }
+  if (match.status !== STATUS.EN_CURSO) {
+    return {
+      bloqueado: match.status === STATUS.BLOQUEADO,
+      mensaje: match.nota || notaBase,
+      salidas: match.salidas || 0,
+      maxSalidas: policy.maxSalidas,
+      accion: 'SIN_CAMBIO',
+    };
+  }
 
-    const tokenToStore = attemptToken || normalizedToken;
+  const attemptToken = match.note.token || '';
+  if (attemptToken && normalizedToken && attemptToken !== normalizedToken) {
     lockAttempt(
       attemptsSheet,
       match.row,
       STATUS.BLOQUEADO,
-      nota,
+      'Se detectó otro acceso con esta cuenta.',
+      now,
+      {
+        token: attemptToken,
+        bloqueo: 'DUPLICADO',
+      },
+    );
+    return {
+      bloqueado: true,
+      mensaje: 'Se detectó otro acceso con esta cuenta. El intento fue bloqueado.',
+      salidas: match.salidas || 0,
+      maxSalidas: policy.maxSalidas,
+      accion: 'BLOQUEO',
+    };
+  }
+
+  const tokenToStore = attemptToken || normalizedToken;
+  const salidas = (match.salidas || 0) + 1;
+  let penalizacionAcumulada = match.penalizacionAcumuladaMs || 0;
+  const advertenciasRestantes = Math.max(0, policy.maxSalidas - salidas);
+  const nota = policy.maxSalidas
+    ? `${notaBase} (${salidas}/${policy.maxSalidas})`
+    : notaBase;
+
+  attemptsSheet.getRange(match.row, 11).setValue(salidas);
+  const noteValue = composeAttemptNoteCell({
+    mensaje: nota,
+    token: tokenToStore,
+  });
+  attemptsSheet.getRange(match.row, 5).setValue(noteValue);
+
+  if (policy.accion === 'BLOQUEO' || salidas > policy.maxSalidas) {
+    lockAttempt(
+      attemptsSheet,
+      match.row,
+      STATUS.BLOQUEADO,
+      notaBase,
       now,
       {
         token: tokenToStore,
         bloqueo: 'ESCAPE',
       },
     );
+    return {
+      bloqueado: true,
+      mensaje: notaBase,
+      salidas,
+      maxSalidas: policy.maxSalidas,
+      accion: 'BLOQUEO',
+    };
   }
+
+  if (policy.accion === 'PENALIZACION' && policy.penalizacionMs > 0) {
+    penalizacionAcumulada += policy.penalizacionMs;
+    attemptsSheet.getRange(match.row, 12).setValue(penalizacionAcumulada);
+    return {
+      bloqueado: false,
+      mensaje: nota,
+      accion: 'PENALIZACION',
+      penalizacionMs: policy.penalizacionMs,
+      penalizacionAcumuladaMs: penalizacionAcumulada,
+      salidas,
+      maxSalidas: policy.maxSalidas,
+      advertenciasRestantes,
+    };
+  }
+
+  return {
+    bloqueado: false,
+    mensaje: nota,
+    accion: 'ADVERTENCIA',
+    penalizacionMs: 0,
+    penalizacionAcumuladaMs: penalizacionAcumulada,
+    salidas,
+    maxSalidas: policy.maxSalidas,
+    advertenciasRestantes,
+  };
 }
 
 function asignarEstudiante(quizId, alumnoId, clientToken) {
@@ -891,6 +1002,101 @@ function buildEscapeConfig(accionRaw, valorRaw, maxSalidasRaw) {
   return {
     accion,
     valor,
+    maxSalidas,
+  };
+}
+
+function parseEscapeValue(valor) {
+  const base = { cantidad: 10, unidad: 'PORCENTAJE' };
+  if (valor === null || valor === undefined) {
+    return base;
+  }
+
+  const text = valor.toString().trim();
+  if (!text) {
+    return base;
+  }
+
+  const lower = text.toLowerCase();
+  const porcentajeMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*%$/);
+  if (porcentajeMatch) {
+    const num = parseFloat(porcentajeMatch[1].replace(',', '.'));
+    return {
+      cantidad: isFinite(num) && num > 0 ? num : base.cantidad,
+      unidad: 'PORCENTAJE',
+    };
+  }
+
+  const minutosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(m|min|mins|minutos)$/);
+  if (minutosMatch) {
+    const num = parseFloat(minutosMatch[1].replace(',', '.'));
+    return {
+      cantidad: isFinite(num) && num > 0 ? num : 1,
+      unidad: 'MINUTOS',
+    };
+  }
+
+  const segundosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(s|seg|segundos)$/);
+  if (segundosMatch) {
+    const num = parseFloat(segundosMatch[1].replace(',', '.'));
+    return {
+      cantidad: isFinite(num) && num > 0 ? num : 30,
+      unidad: 'SEGUNDOS',
+    };
+  }
+
+  const numero = parseFloat(lower.replace(',', '.'));
+  if (isFinite(numero) && numero > 0) {
+    return {
+      cantidad: numero,
+      unidad: 'MINUTOS',
+    };
+  }
+
+  return base;
+}
+
+function normalizeEscapePolicy(rawConfig, limitMs) {
+  const accion = rawConfig && rawConfig.accion
+    ? rawConfig.accion.toString().trim().toUpperCase()
+    : 'PENALIZACION';
+
+  let maxSalidas = Number(rawConfig && rawConfig.maxSalidas);
+  if (!isFinite(maxSalidas) || maxSalidas <= 0) {
+    maxSalidas = accion === 'BLOQUEO' ? 1 : 3;
+  }
+  if (accion === 'BLOQUEO') {
+    maxSalidas = 1;
+  }
+
+  let penalizacionMs = 0;
+  let descripcion = '';
+  if (accion === 'PENALIZACION') {
+    const referencia = limitMs && limitMs > 0 ? limitMs : 10 * 60 * 1000;
+    const parsed = parseEscapeValue(rawConfig && rawConfig.valor);
+    if (parsed.unidad === 'PORCENTAJE') {
+      penalizacionMs = Math.max(1000, Math.round(referencia * (parsed.cantidad / 100)));
+      descripcion = `${parsed.cantidad}% del tiempo total`;
+    } else if (parsed.unidad === 'MINUTOS') {
+      penalizacionMs = Math.max(1000, Math.round(parsed.cantidad * 60000));
+      descripcion = `${parsed.cantidad} minuto${parsed.cantidad === 1 ? '' : 's'}`;
+    } else if (parsed.unidad === 'SEGUNDOS') {
+      penalizacionMs = Math.max(1000, Math.round(parsed.cantidad * 1000));
+      descripcion = `${parsed.cantidad} segundo${parsed.cantidad === 1 ? '' : 's'}`;
+    }
+
+    if (!penalizacionMs || penalizacionMs <= 0) {
+      penalizacionMs = Math.max(30000, Math.round(referencia * 0.1));
+      descripcion = '10% del tiempo total';
+    }
+  } else if (accion === 'ADVERTENCIA') {
+    descripcion = rawConfig && rawConfig.valor ? rawConfig.valor : 'Advertencia registrada';
+  }
+
+  return {
+    accion,
+    penalizacionMs,
+    descripcion,
     maxSalidas,
   };
 }
@@ -1218,6 +1424,8 @@ function findAttemptRow(sheet, email, quizId) {
         alumnoId: (row[7] || '').toString(),
         alumnoNombre: (row[8] || '').toString(),
         alumnoCurso: (row[9] || '').toString(),
+        salidas: Number(row[10]) || 0,
+        penalizacionAcumuladaMs: Number(row[11]) || 0,
       };
     }
   }
