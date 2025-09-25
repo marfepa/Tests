@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+        background: #f1f3f4;
+        color: #202124;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        height: 100vh;
+        overflow: hidden;
+      }
+      .sidebar {
+        background: #202124;
+        color: #e8eaed;
+        display: flex;
+        flex-direction: column;
+        padding: 16px 12px;
+        gap: 12px;
+      }
+      .sidebar h2 {
+        margin: 0 0 8px;
+        font-size: 1.1rem;
+      }
+      .sidebar .actions button {
+        width: 100%;
+        margin-bottom: 8px;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        background: #3c4043;
+        color: #e8eaed;
+        cursor: pointer;
+        font-size: 0.95rem;
+      }
+      .sidebar .actions button.primary {
+        background: #8ab4f8;
+        color: #202124;
+        font-weight: 600;
+      }
+      .sidebar .actions button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .quiz-list {
+        flex: 1;
+        overflow-y: auto;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 8px;
+      }
+      .quiz-item {
+        padding: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-bottom: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .quiz-item:hover {
+        background: rgba(138, 180, 248, 0.2);
+      }
+      .quiz-item.active {
+        background: rgba(138, 180, 248, 0.35);
+      }
+      .quiz-item .title {
+        font-weight: 600;
+      }
+      .quiz-item .meta {
+        font-size: 0.75rem;
+        color: rgba(232, 234, 237, 0.75);
+      }
+      .editor {
+        overflow: auto;
+        padding: 20px 24px 80px;
+      }
+      .editor h1 {
+        margin: 0 0 16px;
+        font-size: 1.4rem;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .block-settings {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #e0e3e7;
+      }
+      .block-settings .inline-field {
+        gap: 8px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      label {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      input[type="text"],
+      input[type="number"],
+      select,
+      textarea {
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #dadce0;
+        font-size: 0.95rem;
+        background: #fff;
+      }
+      textarea {
+        resize: vertical;
+      }
+      input[readonly] {
+        background: #f8f9fa;
+      }
+      .questions-area {
+        margin-top: 12px;
+      }
+      .questions-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .questions-header h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+      .questions-header button {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        background: #1a73e8;
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      .question-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(60, 64, 67, 0.15);
+        padding: 18px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .question-card.dragging {
+        opacity: 0.6;
+      }
+      .question-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .drag-handle {
+        cursor: grab;
+        font-size: 1.2rem;
+        background: #f1f3f4;
+        border-radius: 4px;
+        padding: 4px 8px;
+      }
+      .question-top .title {
+        flex: 1;
+        font-weight: 600;
+      }
+      .question-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .question-actions button {
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        background: #f1f3f4;
+      }
+      .question-actions button.danger {
+        background: #fce8e6;
+        color: #c5221f;
+      }
+      .inline-field {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .inline-field > * {
+        flex: 1;
+      }
+      .options-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .option-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+      }
+      .option-row input[type="text"] {
+        width: 100%;
+      }
+      .option-row button {
+        border: none;
+        background: transparent;
+        color: #c5221f;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+      .add-option {
+        align-self: flex-start;
+        border: none;
+        background: #e8f0fe;
+        color: #1a73e8;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .relation-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #f8f9fa;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid #e0e3e7;
+      }
+      .relation-row {
+        display: grid;
+        grid-template-columns: 1fr 32px 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .relation-row span {
+        text-align: center;
+        color: #5f6368;
+      }
+      .relation-row button {
+        border: none;
+        background: transparent;
+        color: #c5221f;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+      .add-relation {
+        align-self: flex-start;
+        border: none;
+        background: #e8f0fe;
+        color: #1a73e8;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        background: #e8f0fe;
+        color: #1a73e8;
+        border-radius: 16px;
+        padding: 6px 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+      }
+      .chip button {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-size: 1rem;
+        line-height: 1;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        display: none;
+      }
+      .status.visible {
+        display: block;
+      }
+      .status.success {
+        background: #e6f4ea;
+        color: #0b8043;
+      }
+      .status.error {
+        background: #fce8e6;
+        color: #c5221f;
+      }
+      .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 16px;
+      }
+      .form-actions button {
+        padding: 10px 18px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .form-actions .primary {
+        background: #1a73e8;
+        color: #fff;
+      }
+      .form-actions .danger {
+        background: #f28b82;
+        color: #202124;
+      }
+      .empty-state {
+        margin: 60px auto;
+        max-width: 420px;
+        text-align: center;
+        background: #fff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 1px 4px rgba(60, 64, 67, 0.15);
+      }
+      .empty-state h3 {
+        margin: 0 0 8px;
+      }
+      .empty-state p {
+        color: #5f6368;
+        margin-bottom: 16px;
+      }
+      .empty-state button {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        background: #1a73e8;
+        color: #fff;
+        cursor: pointer;
+      }
+      @media (max-width: 960px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          flex-direction: row;
+          overflow-x: auto;
+          height: auto;
+        }
+        .quiz-list {
+          display: flex;
+          flex-direction: row;
+          gap: 8px;
+          overflow-x: auto;
+        }
+        .quiz-item {
+          min-width: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div>
+          <h2>Cuestionarios</h2>
+          <div class="actions">
+            <button class="primary" id="nuevoQuizBtn">Nuevo cuestionario</button>
+            <button id="generarLinksBtn">Actualizar enlaces</button>
+          </div>
+        </div>
+        <div class="quiz-list" id="quizList"></div>
+      </aside>
+      <section class="editor" id="editor">
+        <div class="empty-state" id="emptyState">
+          <h3>No hay cuestionario seleccionado</h3>
+          <p>Elige uno de la lista o crea un cuestionario nuevo para empezar a diseñar preguntas.</p>
+          <button id="emptyCreateBtn">Crear cuestionario</button>
+        </div>
+        <form id="quizForm" class="hidden">
+          <h1 id="formTitle">Editar cuestionario</h1>
+          <div class="form-grid">
+            <div class="field">
+              <label for="quizIdInput">Identificador (QuizId)</label>
+              <input type="text" id="quizIdInput" placeholder="Ej: QUIZ_FUNCIONES" required>
+              <small>Se usa en los enlaces y no admite espacios.</small>
+            </div>
+          <div class="field">
+            <label for="tituloInput">Título visible</label>
+            <input type="text" id="tituloInput" placeholder="Nombre del cuestionario" required>
+          </div>
+          <div class="field">
+            <label for="duracionInput">Duración (minutos)</label>
+            <input type="number" id="duracionInput" min="0" step="1" value="10">
+          </div>
+          <div class="field">
+            <label for="cursoInput">Curso destino (opcional)</label>
+            <input type="text" id="cursoInput" placeholder="Ej: 3ºESO A">
+            <small>Filtra el selector de estudiantes por curso. Puedes indicar varios separados por coma.</small>
+          </div>
+        </div>
+
+        <div class="block-settings" id="escapeSettings">
+          <div class="field">
+            <label for="escapeActionSelect">Acción al abandonar la pantalla</label>
+            <select id="escapeActionSelect">
+              <option value="PENALIZACION">Penalización temporal</option>
+              <option value="BLOQUEO">Bloqueo inmediato</option>
+              <option value="ADVERTENCIA">Solo advertencia</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="escapeValueInput">Duración de la penalización</label>
+            <div class="inline-field">
+              <input type="number" id="escapeValueInput" min="1" step="1" value="10">
+              <select id="escapeUnitSelect">
+                <option value="PORCENTAJE">% del tiempo total</option>
+                <option value="MINUTOS">Minutos</option>
+                <option value="SEGUNDOS">Segundos</option>
+              </select>
+            </div>
+            <small>Se aplica cuando la acción es penalización temporal.</small>
+          </div>
+          <div class="field">
+            <label for="escapeMaxInput">Salidas permitidas antes de bloquear</label>
+            <input type="number" id="escapeMaxInput" min="1" step="1" value="2">
+            <small>Incluye la advertencia/penalización inicial.</small>
+          </div>
+        </div>
+
+        <div class="questions-area">
+          <div class="questions-header">
+            <h2>Preguntas</h2>
+            <button type="button" id="addQuestionBtn">Añadir pregunta</button>
+            </div>
+            <div id="questionsContainer"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="danger" id="deleteQuizBtn">Eliminar cuestionario</button>
+            <button type="button" class="primary" id="saveQuizBtn">Guardar cuestionario</button>
+          </div>
+          <div class="status" id="builderStatus"></div>
+        </form>
+      </section>
+    </div>
+
+    <script>
+      const estado = {
+        quizzes: [],
+        current: null,
+        isNew: true,
+      };
+
+      const quizListEl = document.getElementById('quizList');
+      const quizForm = document.getElementById('quizForm');
+      const emptyState = document.getElementById('emptyState');
+      const questionsContainer = document.getElementById('questionsContainer');
+      const statusBox = document.getElementById('builderStatus');
+      const quizIdInput = document.getElementById('quizIdInput');
+      const tituloInput = document.getElementById('tituloInput');
+      const duracionInput = document.getElementById('duracionInput');
+      const cursoInput = document.getElementById('cursoInput');
+      const formTitle = document.getElementById('formTitle');
+      const deleteQuizBtn = document.getElementById('deleteQuizBtn');
+      const escapeActionSelect = document.getElementById('escapeActionSelect');
+      const escapeValueInput = document.getElementById('escapeValueInput');
+      const escapeUnitSelect = document.getElementById('escapeUnitSelect');
+      const escapeMaxInput = document.getElementById('escapeMaxInput');
+
+      document.getElementById('nuevoQuizBtn').addEventListener('click', () => prepararNuevoQuiz());
+      document.getElementById('emptyCreateBtn').addEventListener('click', () => prepararNuevoQuiz());
+      document.getElementById('addQuestionBtn').addEventListener('click', () => {
+        if (!estado.current) {
+          return;
+        }
+        estado.current.preguntas.push(crearPregunta());
+        renderQuestions();
+      });
+      document.getElementById('saveQuizBtn').addEventListener('click', guardarQuiz);
+      document.getElementById('generarLinksBtn').addEventListener('click', actualizarEnlaces);
+      deleteQuizBtn.addEventListener('click', eliminarQuizActual);
+      escapeActionSelect.addEventListener('change', event => {
+        if (!estado.current) {
+          return;
+        }
+        estado.current.escapeConfig = estado.current.escapeConfig || defaultEscapeConfig();
+        estado.current.escapeConfig.accion = event.target.value;
+        if (estado.current.escapeConfig.accion === 'BLOQUEO') {
+          estado.current.escapeConfig.maxSalidas = 1;
+        } else if (estado.current.escapeConfig.maxSalidas < 1) {
+          estado.current.escapeConfig.maxSalidas = 2;
+        }
+        actualizarCamposBloqueo();
+      });
+      escapeValueInput.addEventListener('input', event => {
+        if (!estado.current || !estado.current.escapeConfig) {
+          return;
+        }
+        const value = parseFloat(event.target.value);
+        estado.current.escapeConfig.cantidad = isFinite(value) ? value : 0;
+      });
+      escapeUnitSelect.addEventListener('change', event => {
+        if (!estado.current || !estado.current.escapeConfig) {
+          return;
+        }
+        estado.current.escapeConfig.unidad = event.target.value;
+      });
+      escapeMaxInput.addEventListener('input', event => {
+        if (!estado.current || !estado.current.escapeConfig) {
+          return;
+        }
+        let value = parseInt(event.target.value, 10);
+        if (!isFinite(value) || value < 1) {
+          value = estado.current.escapeConfig.accion === 'BLOQUEO' ? 1 : 2;
+        }
+        if (estado.current.escapeConfig.accion === 'BLOQUEO') {
+          value = 1;
+        }
+        estado.current.escapeConfig.maxSalidas = value;
+        escapeMaxInput.value = value;
+      });
+
+      function init() {
+        cargarCuestionarios();
+      }
+
+      function cargarCuestionarios() {
+        quizListEl.innerHTML = '<p>Cargando…</p>';
+        google.script.run
+          .withSuccessHandler(quizzes => {
+            estado.quizzes = Array.isArray(quizzes) ? quizzes : [];
+            renderQuizList();
+          })
+          .withFailureHandler(err => mostrarStatus(err.message || 'No se pudieron cargar los cuestionarios.', 'error'))
+          .listarCuestionarios();
+      }
+
+      function renderQuizList() {
+        quizListEl.innerHTML = '';
+        if (!estado.quizzes.length) {
+          const aviso = document.createElement('p');
+          aviso.textContent = 'No hay cuestionarios guardados.';
+          aviso.style.opacity = '0.7';
+          quizListEl.appendChild(aviso);
+          return;
+        }
+        estado.quizzes.forEach(quiz => {
+          const item = document.createElement('div');
+          item.className = 'quiz-item';
+          if (estado.current && quiz.quizId === estado.current.quizId) {
+            item.classList.add('active');
+          }
+          item.dataset.quizId = quiz.quizId;
+
+          const title = document.createElement('span');
+          title.className = 'title';
+          title.textContent = quiz.titulo || quiz.quizId;
+
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        const duracion = quiz.duracionMin ? `${quiz.duracionMin} min · ` : '';
+        const cursoTag = quiz.cursoDestino ? ` · ${quiz.cursoDestino}` : '';
+        meta.textContent = `${duracion}${quiz.quizId}${cursoTag}`;
+
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.addEventListener('click', () => abrirQuiz(quiz.quizId));
+          quizListEl.appendChild(item);
+        });
+      }
+
+      function abrirQuiz(quizId) {
+        mostrarStatus('', '');
+        google.script.run
+          .withSuccessHandler(quiz => {
+            if (!quiz) {
+              mostrarStatus('No se encontró el cuestionario.', 'error');
+              return;
+            }
+            estado.current = normalizarQuiz(quiz);
+            estado.isNew = false;
+            configurarFormulario();
+            renderQuizList();
+          })
+          .withFailureHandler(err => mostrarStatus(err.message || 'No se pudo abrir el cuestionario.', 'error'))
+          .obtenerQuizCompleto(quizId);
+      }
+
+      function prepararNuevoQuiz() {
+        mostrarStatus('', '');
+        estado.current = {
+          quizId: '',
+          titulo: '',
+          duracionMin: 10,
+          cursoDestino: '',
+          preguntas: [],
+          escapeConfig: defaultEscapeConfig(),
+        };
+        estado.isNew = true;
+        configurarFormulario();
+        Array.from(quizListEl.querySelectorAll('.quiz-item')).forEach(el => el.classList.remove('active'));
+      }
+
+      function normalizarQuiz(quiz) {
+        const preguntas = (quiz.preguntas || []).map(p => ({
+          uid: generarUid('q'),
+          numero: p.numero,
+          texto: p.texto || '',
+          tipo: p.tipo || 'radio',
+          puntaje: Number(p.puntaje) || 1,
+          opciones: Array.isArray(p.opciones)
+            ? p.opciones.map(op => ({ uid: generarUid('op'), texto: op }))
+            : [],
+          correctas: Array.isArray(p.correctas) ? p.correctas.slice() : [],
+          config: p && typeof p.config === 'object' ? JSON.parse(JSON.stringify(p.config)) : {},
+        }));
+
+        preguntas.forEach(pregunta => {
+          pregunta.opciones = Array.isArray(pregunta.opciones) ? pregunta.opciones : [];
+          pregunta.correctas = Array.isArray(pregunta.correctas) ? pregunta.correctas : [];
+          pregunta.config = pregunta && typeof pregunta.config === 'object' ? pregunta.config : {};
+          if (pregunta.tipo === 'radio' || pregunta.tipo === 'opcion' || pregunta.tipo === 'checkbox') {
+            const mapa = new Map();
+            pregunta.opciones.forEach(op => mapa.set(op.texto, op.uid));
+            pregunta.correctas = pregunta.correctas
+              .map(valor => (mapa.has(valor) ? mapa.get(valor) : null))
+              .filter(Boolean);
+            if ((pregunta.tipo === 'radio' || pregunta.tipo === 'opcion') && !pregunta.correctas.length && pregunta.opciones.length) {
+              pregunta.correctas = [pregunta.opciones[0].uid];
+            }
+          } else if (pregunta.tipo === 'relacion') {
+            const relacionesOrigen = Array.isArray(pregunta.config.relaciones)
+              ? pregunta.config.relaciones
+              : pregunta.opciones.map((op, idx) => ({ izquierda: op.texto || op, derecha: pregunta.correctas[idx] || '' }));
+            pregunta.relaciones = relacionesOrigen.map(par => ({
+              uid: generarUid('rel'),
+              izquierda: (par && par.izquierda) || '',
+              derecha: (par && par.derecha) || '',
+            }));
+            if (pregunta.relaciones.length < 2) {
+              while (pregunta.relaciones.length < 2) {
+                pregunta.relaciones.push({
+                  uid: generarUid('rel'),
+                  izquierda: `Elemento ${String.fromCharCode(65 + pregunta.relaciones.length)}`,
+                  derecha: `Relacionado ${pregunta.relaciones.length + 1}`,
+                });
+              }
+            }
+            pregunta.opciones = [];
+            pregunta.correctas = [];
+            pregunta.config.relaciones = pregunta.relaciones.map(par => ({
+              izquierda: par.izquierda,
+              derecha: par.derecha,
+            }));
+          } else if (pregunta.tipo === 'escala') {
+            const escala = pregunta.config.escala || {};
+            const min = Number(escala.min);
+            const max = Number(escala.max);
+            const step = escala.step !== undefined ? Number(escala.step) : 1;
+            pregunta.config.escala = {
+              min: isFinite(min) ? min : 1,
+              max: isFinite(max) && max > (isFinite(min) ? min : 1) ? max : Math.max((isFinite(min) ? min : 1) + 4, 5),
+              step: isFinite(step) && step > 0 ? step : 1,
+              etiquetaMin: typeof escala.etiquetaMin === 'string' ? escala.etiquetaMin : '',
+              etiquetaMax: typeof escala.etiquetaMax === 'string' ? escala.etiquetaMax : '',
+            };
+            pregunta.opciones = [];
+            pregunta.correctas = [];
+          }
+        });
+
+        return {
+          quizId: quiz.quizId,
+          titulo: quiz.titulo || '',
+          duracionMin: Number(quiz.duracionMin) || 0,
+          cursoDestino: quiz.cursoDestino || '',
+          escapeConfig: mapEscapeConfigFromServer(quiz.escapeConfig),
+          preguntas,
+        };
+      }
+
+      function configurarFormulario() {
+        if (!estado.current) {
+          quizForm.classList.add('hidden');
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        emptyState.style.display = 'none';
+        quizForm.classList.remove('hidden');
+        formTitle.textContent = estado.isNew ? 'Nuevo cuestionario' : 'Editar cuestionario';
+        quizIdInput.value = estado.current.quizId || '';
+        quizIdInput.readOnly = !estado.isNew;
+        quizIdInput.placeholder = estado.isNew ? 'Ej: QUIZ_FUNCIONES' : estado.current.quizId;
+        tituloInput.value = estado.current.titulo || '';
+        duracionInput.value = estado.current.duracionMin || 0;
+        cursoInput.value = estado.current.cursoDestino || '';
+        estado.current.escapeConfig = mapEscapeConfigFromServer(estado.current.escapeConfig);
+        sincronizarCamposBloqueo();
+        deleteQuizBtn.style.display = estado.isNew ? 'none' : 'inline-flex';
+        renderQuestions();
+      }
+
+      function renderQuestions() {
+        questionsContainer.innerHTML = '';
+        if (!estado.current) {
+          return;
+        }
+        if (!estado.current.preguntas.length) {
+          const aviso = document.createElement('p');
+          aviso.textContent = 'Todavía no hay preguntas. Pulsa "Añadir pregunta".';
+          aviso.style.opacity = '0.7';
+          questionsContainer.appendChild(aviso);
+          return;
+        }
+
+        estado.current.preguntas.forEach((pregunta, index) => {
+          pregunta.opciones = Array.isArray(pregunta.opciones) ? pregunta.opciones : [];
+          pregunta.correctas = Array.isArray(pregunta.correctas) ? pregunta.correctas : [];
+
+          const card = document.createElement('div');
+          card.className = 'question-card';
+          card.draggable = true;
+          card.dataset.uid = pregunta.uid;
+
+          const cabecera = document.createElement('div');
+          cabecera.className = 'question-top';
+
+          const dragHandle = document.createElement('span');
+          dragHandle.className = 'drag-handle';
+          dragHandle.textContent = '⠿';
+
+          const titulo = document.createElement('span');
+          titulo.className = 'title';
+          titulo.textContent = `Pregunta ${index + 1}`;
+
+          const acciones = document.createElement('div');
+          acciones.className = 'question-actions';
+
+          const duplicarBtn = document.createElement('button');
+          duplicarBtn.type = 'button';
+          duplicarBtn.textContent = 'Duplicar';
+          duplicarBtn.addEventListener('click', () => duplicarPregunta(pregunta.uid));
+
+          const eliminarBtn = document.createElement('button');
+          eliminarBtn.type = 'button';
+          eliminarBtn.textContent = 'Eliminar';
+          eliminarBtn.classList.add('danger');
+          eliminarBtn.addEventListener('click', () => eliminarPregunta(pregunta.uid));
+
+          acciones.appendChild(duplicarBtn);
+          acciones.appendChild(eliminarBtn);
+          cabecera.appendChild(dragHandle);
+          cabecera.appendChild(titulo);
+          cabecera.appendChild(acciones);
+          card.appendChild(cabecera);
+
+          const enunciadoField = document.createElement('div');
+          enunciadoField.className = 'field';
+          const enunciadoLabel = document.createElement('label');
+          enunciadoLabel.textContent = 'Enunciado';
+          const enunciadoTextarea = document.createElement('textarea');
+          enunciadoTextarea.value = pregunta.texto;
+          enunciadoTextarea.rows = 3;
+          enunciadoTextarea.addEventListener('input', event => {
+            pregunta.texto = event.target.value;
+          });
+          enunciadoField.appendChild(enunciadoLabel);
+          enunciadoField.appendChild(enunciadoTextarea);
+          card.appendChild(enunciadoField);
+
+          const inlineField = document.createElement('div');
+          inlineField.className = 'inline-field';
+
+          const tipoField = document.createElement('div');
+          tipoField.className = 'field';
+          const tipoLabel = document.createElement('label');
+          tipoLabel.textContent = 'Tipo de respuesta';
+          const tipoSelect = document.createElement('select');
+          [
+            { value: 'radio', label: 'Opción única (radio)' },
+            { value: 'checkbox', label: 'Múltiples opciones (checkbox)' },
+            { value: 'relacion', label: 'Relacionar columnas' },
+            { value: 'escala', label: 'Escala competencial' },
+            { value: 'texto', label: 'Respuesta corta' },
+            { value: 'parrafo', label: 'Respuesta larga' },
+          ].forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.value;
+            opt.textContent = option.label;
+            if (option.value === pregunta.tipo) {
+              opt.selected = true;
+            }
+            tipoSelect.appendChild(opt);
+          });
+          tipoSelect.addEventListener('change', event => cambiarTipoPregunta(pregunta.uid, event.target.value));
+          tipoField.appendChild(tipoLabel);
+          tipoField.appendChild(tipoSelect);
+
+          const puntajeField = document.createElement('div');
+          puntajeField.className = 'field';
+          const puntajeLabel = document.createElement('label');
+          puntajeLabel.textContent = 'Puntaje';
+          const puntajeInput = document.createElement('input');
+          puntajeInput.type = 'number';
+          puntajeInput.min = '0';
+          puntajeInput.step = '0.5';
+          puntajeInput.value = pregunta.puntaje;
+          puntajeInput.addEventListener('input', event => {
+            const value = parseFloat(event.target.value);
+            pregunta.puntaje = isFinite(value) ? value : 0;
+          });
+          puntajeField.appendChild(puntajeLabel);
+          puntajeField.appendChild(puntajeInput);
+
+          inlineField.appendChild(tipoField);
+          inlineField.appendChild(puntajeField);
+          card.appendChild(inlineField);
+
+          if (pregunta.tipo === 'radio' || pregunta.tipo === 'opcion' || pregunta.tipo === 'checkbox') {
+            card.appendChild(renderOpciones(pregunta));
+          } else if (pregunta.tipo === 'texto') {
+            card.appendChild(renderRespuestasAceptadas(pregunta));
+          } else if (pregunta.tipo === 'parrafo') {
+            const aviso = document.createElement('div');
+            aviso.className = 'field';
+            const labelAviso = document.createElement('label');
+            labelAviso.textContent = 'Corrección manual';
+            const nota = document.createElement('div');
+            nota.textContent = 'Esta respuesta no se autocorrige. Añade instrucciones para la corrección manual.';
+            nota.style.fontSize = '0.85rem';
+            nota.style.color = '#5f6368';
+            aviso.appendChild(labelAviso);
+            aviso.appendChild(nota);
+            card.appendChild(aviso);
+          } else if (pregunta.tipo === 'relacion') {
+            card.appendChild(renderRelacion(pregunta));
+          } else if (pregunta.tipo === 'escala') {
+            card.appendChild(renderEscala(pregunta));
+          }
+
+          questionsContainer.appendChild(card);
+        });
+
+        inicializarDragAndDrop();
+      }
+
+      function renderOpciones(pregunta) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'options-container';
+
+        const heading = document.createElement('strong');
+        heading.textContent = 'Opciones';
+        wrapper.appendChild(heading);
+
+        if (!pregunta.opciones.length) {
+          pregunta.opciones.push({ uid: generarUid('op'), texto: 'Opción A' });
+          pregunta.opciones.push({ uid: generarUid('op'), texto: 'Opción B' });
+        }
+
+        if ((pregunta.tipo === 'radio' || pregunta.tipo === 'opcion') && !pregunta.correctas.length && pregunta.opciones.length) {
+          pregunta.correctas = [pregunta.opciones[0].uid];
+        }
+
+        pregunta.opciones.forEach(opcion => {
+          const row = document.createElement('div');
+          row.className = 'option-row';
+
+          const selector = document.createElement('input');
+          if (pregunta.tipo === 'radio' || pregunta.tipo === 'opcion') {
+            selector.type = 'radio';
+            selector.name = `correct-${pregunta.uid}`;
+            selector.checked = pregunta.correctas.includes(opcion.uid);
+            selector.addEventListener('change', () => {
+              pregunta.correctas = [opcion.uid];
+            });
+          } else {
+            selector.type = 'checkbox';
+            selector.checked = pregunta.correctas.includes(opcion.uid);
+            selector.addEventListener('change', event => {
+              if (event.target.checked) {
+                if (!pregunta.correctas.includes(opcion.uid)) {
+                  pregunta.correctas.push(opcion.uid);
+                }
+              } else {
+                pregunta.correctas = pregunta.correctas.filter(id => id !== opcion.uid);
+              }
+            });
+          }
+
+          const texto = document.createElement('input');
+          texto.type = 'text';
+          texto.value = opcion.texto;
+          texto.placeholder = 'Texto de la opción';
+          texto.addEventListener('input', event => {
+            opcion.texto = event.target.value;
+          });
+
+          const eliminar = document.createElement('button');
+          eliminar.type = 'button';
+          eliminar.setAttribute('aria-label', 'Eliminar opción');
+          eliminar.textContent = '✕';
+          eliminar.addEventListener('click', () => eliminarOpcion(pregunta.uid, opcion.uid));
+
+          row.appendChild(selector);
+          row.appendChild(texto);
+          row.appendChild(eliminar);
+          wrapper.appendChild(row);
+        });
+
+        const addOption = document.createElement('button');
+        addOption.type = 'button';
+        addOption.className = 'add-option';
+        addOption.textContent = 'Añadir opción';
+        addOption.addEventListener('click', () => {
+          pregunta.opciones.push({ uid: generarUid('op'), texto: `Opción ${pregunta.opciones.length + 1}` });
+          renderQuestions();
+        });
+
+        wrapper.appendChild(addOption);
+        return wrapper;
+      }
+
+      function renderRelacion(pregunta) {
+        if (!Array.isArray(pregunta.relaciones)) {
+          pregunta.relaciones = [
+            { uid: generarUid('rel'), izquierda: 'Elemento A', derecha: 'Relacionado 1' },
+            { uid: generarUid('rel'), izquierda: 'Elemento B', derecha: 'Relacionado 2' },
+          ];
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relation-container';
+
+        const heading = document.createElement('strong');
+        heading.textContent = 'Define los pares a relacionar';
+        wrapper.appendChild(heading);
+
+        pregunta.relaciones.forEach(relacion => {
+          const row = document.createElement('div');
+          row.className = 'relation-row';
+
+          const izquierdaInput = document.createElement('input');
+          izquierdaInput.type = 'text';
+          izquierdaInput.value = relacion.izquierda;
+          izquierdaInput.placeholder = 'Elemento (columna izquierda)';
+          izquierdaInput.addEventListener('input', event => {
+            relacion.izquierda = event.target.value;
+            sincronizarRelaciones(pregunta);
+          });
+
+          const arrow = document.createElement('span');
+          arrow.textContent = '↔';
+
+          const derechaInput = document.createElement('input');
+          derechaInput.type = 'text';
+          derechaInput.value = relacion.derecha;
+          derechaInput.placeholder = 'Coincidencia (columna derecha)';
+          derechaInput.addEventListener('input', event => {
+            relacion.derecha = event.target.value;
+            sincronizarRelaciones(pregunta);
+          });
+
+          const eliminar = document.createElement('button');
+          eliminar.type = 'button';
+          eliminar.setAttribute('aria-label', 'Eliminar relación');
+          eliminar.textContent = '✕';
+          eliminar.addEventListener('click', () => {
+            if (pregunta.relaciones.length <= 2) {
+              mostrarStatus('Una pregunta de relación necesita al menos dos pares.', 'error');
+              return;
+            }
+            pregunta.relaciones = pregunta.relaciones.filter(item => item.uid !== relacion.uid);
+            sincronizarRelaciones(pregunta);
+            renderQuestions();
+          });
+
+          row.appendChild(izquierdaInput);
+          row.appendChild(arrow);
+          row.appendChild(derechaInput);
+          row.appendChild(eliminar);
+          wrapper.appendChild(row);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'add-relation';
+        addBtn.textContent = 'Añadir relación';
+        addBtn.addEventListener('click', () => {
+          pregunta.relaciones.push({
+            uid: generarUid('rel'),
+            izquierda: `Elemento ${String.fromCharCode(65 + pregunta.relaciones.length)}`,
+            derecha: `Relacionado ${pregunta.relaciones.length + 1}`,
+          });
+          sincronizarRelaciones(pregunta);
+          renderQuestions();
+        });
+        wrapper.appendChild(addBtn);
+
+        return wrapper;
+      }
+
+      function renderEscala(pregunta) {
+        pregunta.config = pregunta.config && typeof pregunta.config === 'object' ? pregunta.config : {};
+        const escala = pregunta.config.escala || {
+          min: 1,
+          max: 5,
+          step: 1,
+          etiquetaMin: 'Nivel inicial',
+          etiquetaMax: 'Nivel avanzado',
+        };
+        pregunta.config.escala = escala;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'options-container';
+
+        const heading = document.createElement('strong');
+        heading.textContent = 'Configura la escala';
+        wrapper.appendChild(heading);
+
+        const valoresField = document.createElement('div');
+        valoresField.className = 'inline-field';
+
+        const minField = document.createElement('div');
+        minField.className = 'field';
+        const minLabel = document.createElement('label');
+        minLabel.textContent = 'Valor mínimo';
+        const minInput = document.createElement('input');
+        minInput.type = 'number';
+        minInput.step = '1';
+        minInput.value = escala.min;
+        minInput.addEventListener('input', event => {
+          const value = Number(event.target.value);
+          if (isFinite(value)) {
+            escala.min = value;
+            if (escala.max <= escala.min) {
+              escala.max = escala.min + 1;
+              maxInput.value = escala.max;
+            }
+          }
+        });
+        minField.appendChild(minLabel);
+        minField.appendChild(minInput);
+
+        const maxField = document.createElement('div');
+        maxField.className = 'field';
+        const maxLabel = document.createElement('label');
+        maxLabel.textContent = 'Valor máximo';
+        const maxInput = document.createElement('input');
+        maxInput.type = 'number';
+        maxInput.step = '1';
+        maxInput.value = escala.max;
+        maxInput.addEventListener('input', event => {
+          const value = Number(event.target.value);
+          if (isFinite(value)) {
+            escala.max = value > escala.min ? value : escala.min + 1;
+            maxInput.value = escala.max;
+          }
+        });
+        maxField.appendChild(maxLabel);
+        maxField.appendChild(maxInput);
+
+        const stepField = document.createElement('div');
+        stepField.className = 'field';
+        const stepLabel = document.createElement('label');
+        stepLabel.textContent = 'Incremento';
+        const stepInput = document.createElement('input');
+        stepInput.type = 'number';
+        stepInput.step = '0.1';
+        stepInput.min = '0.1';
+        stepInput.value = escala.step;
+        stepInput.addEventListener('input', event => {
+          const value = Number(event.target.value);
+          escala.step = isFinite(value) && value > 0 ? value : 1;
+          stepInput.value = escala.step;
+        });
+        stepField.appendChild(stepLabel);
+        stepField.appendChild(stepInput);
+
+        valoresField.appendChild(minField);
+        valoresField.appendChild(maxField);
+        valoresField.appendChild(stepField);
+        wrapper.appendChild(valoresField);
+
+        const etiquetasField = document.createElement('div');
+        etiquetasField.className = 'inline-field';
+
+        const etiquetaMinField = document.createElement('div');
+        etiquetaMinField.className = 'field';
+        const etiquetaMinLabel = document.createElement('label');
+        etiquetaMinLabel.textContent = 'Etiqueta inferior';
+        const etiquetaMinInput = document.createElement('input');
+        etiquetaMinInput.type = 'text';
+        etiquetaMinInput.value = escala.etiquetaMin || '';
+        etiquetaMinInput.placeholder = 'Ej: Iniciado';
+        etiquetaMinInput.addEventListener('input', event => {
+          escala.etiquetaMin = event.target.value;
+        });
+        etiquetaMinField.appendChild(etiquetaMinLabel);
+        etiquetaMinField.appendChild(etiquetaMinInput);
+
+        const etiquetaMaxField = document.createElement('div');
+        etiquetaMaxField.className = 'field';
+        const etiquetaMaxLabel = document.createElement('label');
+        etiquetaMaxLabel.textContent = 'Etiqueta superior';
+        const etiquetaMaxInput = document.createElement('input');
+        etiquetaMaxInput.type = 'text';
+        etiquetaMaxInput.value = escala.etiquetaMax || '';
+        etiquetaMaxInput.placeholder = 'Ej: Excelente';
+        etiquetaMaxInput.addEventListener('input', event => {
+          escala.etiquetaMax = event.target.value;
+        });
+        etiquetaMaxField.appendChild(etiquetaMaxLabel);
+        etiquetaMaxField.appendChild(etiquetaMaxInput);
+
+        etiquetasField.appendChild(etiquetaMinField);
+        etiquetasField.appendChild(etiquetaMaxField);
+        wrapper.appendChild(etiquetasField);
+
+        const nota = document.createElement('small');
+        nota.textContent = 'Esta pregunta requiere revisión manual para asignar el puntaje.';
+        nota.style.display = 'block';
+        nota.style.marginTop = '8px';
+        nota.style.color = '#5f6368';
+        wrapper.appendChild(nota);
+
+        return wrapper;
+      }
+
+      function sincronizarRelaciones(pregunta) {
+        if (!pregunta.config || typeof pregunta.config !== 'object') {
+          pregunta.config = {};
+        }
+        pregunta.config.relaciones = Array.isArray(pregunta.relaciones)
+          ? pregunta.relaciones.map(par => ({
+              izquierda: par.izquierda || '',
+              derecha: par.derecha || '',
+            }))
+          : [];
+      }
+
+      function renderRespuestasAceptadas(pregunta) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'options-container';
+
+        const heading = document.createElement('strong');
+        heading.textContent = 'Respuestas aceptadas';
+        wrapper.appendChild(heading);
+
+        if (!Array.isArray(pregunta.correctas)) {
+          pregunta.correctas = [];
+        }
+
+        const chips = document.createElement('div');
+        chips.className = 'chips';
+        pregunta.correctas.forEach(valor => {
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = valor;
+          const eliminar = document.createElement('button');
+          eliminar.type = 'button';
+          eliminar.textContent = '×';
+          eliminar.addEventListener('click', () => {
+            pregunta.correctas = pregunta.correctas.filter(item => item !== valor);
+            renderQuestions();
+          });
+          chip.appendChild(eliminar);
+          chips.appendChild(chip);
+        });
+        wrapper.appendChild(chips);
+
+        const inputWrapper = document.createElement('div');
+        inputWrapper.className = 'inline-field';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Escribe una respuesta y pulsa añadir';
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'add-option';
+        addBtn.textContent = 'Añadir';
+        addBtn.addEventListener('click', () => {
+          const valor = input.value.trim();
+          if (!valor) {
+            return;
+          }
+          if (!pregunta.correctas.includes(valor)) {
+            pregunta.correctas.push(valor);
+          }
+          input.value = '';
+          renderQuestions();
+        });
+
+        input.addEventListener('keydown', event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            addBtn.click();
+          }
+        });
+
+        inputWrapper.appendChild(input);
+        inputWrapper.appendChild(addBtn);
+        wrapper.appendChild(inputWrapper);
+
+        const ayuda = document.createElement('small');
+        ayuda.textContent = 'La corrección no distingue mayúsculas/minúsculas.';
+        ayuda.style.color = '#5f6368';
+        wrapper.appendChild(ayuda);
+
+        return wrapper;
+      }
+
+      function duplicarPregunta(uid) {
+        const indice = estado.current.preguntas.findIndex(p => p.uid === uid);
+        if (indice === -1) {
+          return;
+        }
+        const original = estado.current.preguntas[indice];
+        const copiaOpciones = original.opciones.map(op => ({ uid: generarUid('op'), texto: op.texto }));
+        const mapaOriginal = new Map();
+        original.opciones.forEach(op => mapaOriginal.set(op.uid, op.texto));
+        const mapaCopia = new Map();
+        copiaOpciones.forEach(op => mapaCopia.set(op.texto, op.uid));
+
+        const copia = {
+          uid: generarUid('q'),
+          texto: original.texto,
+          tipo: original.tipo,
+          puntaje: original.puntaje,
+          opciones: copiaOpciones,
+          correctas: [],
+          config: original.config && typeof original.config === 'object' ? JSON.parse(JSON.stringify(original.config)) : {},
+        };
+
+        if (original.tipo === 'radio' || original.tipo === 'opcion' || original.tipo === 'checkbox') {
+          copia.correctas = original.correctas
+            .map(id => {
+              const texto = mapaOriginal.get(id);
+              return texto && mapaCopia.has(texto) ? mapaCopia.get(texto) : null;
+            })
+            .filter(Boolean);
+          if ((original.tipo === 'radio' || original.tipo === 'opcion') && !copia.correctas.length && copia.opciones.length) {
+            copia.correctas = [copia.opciones[0].uid];
+          }
+        } else if (original.tipo === 'texto') {
+          copia.correctas = Array.isArray(original.correctas) ? original.correctas.slice() : [];
+        } else if (original.tipo === 'relacion') {
+          const relaciones = Array.isArray(original.relaciones)
+            ? original.relaciones
+            : (original.config && Array.isArray(original.config.relaciones) ? original.config.relaciones : []);
+          copia.relaciones = relaciones.map(par => ({
+            uid: generarUid('rel'),
+            izquierda: par.izquierda || '',
+            derecha: par.derecha || '',
+          }));
+          copia.config = copia.config || {};
+          copia.config.relaciones = copia.relaciones.map(par => ({ izquierda: par.izquierda, derecha: par.derecha }));
+          copia.opciones = [];
+          copia.correctas = [];
+        } else if (original.tipo === 'escala') {
+          const escala = original.config && original.config.escala ? original.config.escala : {};
+          copia.config = copia.config || {};
+          copia.config.escala = {
+            min: escala.min,
+            max: escala.max,
+            step: escala.step,
+            etiquetaMin: escala.etiquetaMin || '',
+            etiquetaMax: escala.etiquetaMax || '',
+          };
+          copia.opciones = [];
+          copia.correctas = [];
+        }
+
+        estado.current.preguntas.splice(indice + 1, 0, copia);
+        renderQuestions();
+      }
+
+      function eliminarPregunta(uid) {
+        if (!estado.current) {
+          return;
+        }
+        estado.current.preguntas = estado.current.preguntas.filter(p => p.uid !== uid);
+        renderQuestions();
+      }
+
+      function eliminarOpcion(preguntaUid, opcionUid) {
+        const pregunta = estado.current.preguntas.find(p => p.uid === preguntaUid);
+        if (!pregunta) {
+          return;
+        }
+        if (pregunta.opciones.length <= 2) {
+          mostrarStatus('Una pregunta debe tener al menos dos opciones.', 'error');
+          return;
+        }
+        pregunta.opciones = pregunta.opciones.filter(op => op.uid !== opcionUid);
+        pregunta.correctas = pregunta.correctas.filter(id => id !== opcionUid);
+        if ((pregunta.tipo === 'radio' || pregunta.tipo === 'opcion') && !pregunta.correctas.length && pregunta.opciones.length) {
+          pregunta.correctas = [pregunta.opciones[0].uid];
+        }
+        renderQuestions();
+      }
+
+      function cambiarTipoPregunta(uid, nuevoTipo) {
+        const pregunta = estado.current.preguntas.find(p => p.uid === uid);
+        if (!pregunta) {
+          return;
+        }
+        pregunta.tipo = nuevoTipo;
+        if (nuevoTipo === 'radio' || nuevoTipo === 'opcion') {
+          if (!pregunta.opciones.length) {
+            pregunta.opciones = [
+              { uid: generarUid('op'), texto: 'Opción A' },
+              { uid: generarUid('op'), texto: 'Opción B' },
+            ];
+          }
+          pregunta.correctas = [pregunta.opciones[0].uid];
+        } else if (nuevoTipo === 'checkbox') {
+          if (!pregunta.opciones.length) {
+            pregunta.opciones = [
+              { uid: generarUid('op'), texto: 'Opción A' },
+              { uid: generarUid('op'), texto: 'Opción B' },
+              { uid: generarUid('op'), texto: 'Opción C' },
+            ];
+          }
+          pregunta.correctas = [];
+        } else if (nuevoTipo === 'texto') {
+          pregunta.opciones = [];
+          pregunta.correctas = [];
+        } else if (nuevoTipo === 'parrafo') {
+          pregunta.opciones = [];
+          pregunta.correctas = [];
+        } else if (nuevoTipo === 'relacion') {
+          pregunta.opciones = [];
+          pregunta.correctas = [];
+          pregunta.relaciones = [
+            { uid: generarUid('rel'), izquierda: 'Elemento A', derecha: 'Relacionado 1' },
+            { uid: generarUid('rel'), izquierda: 'Elemento B', derecha: 'Relacionado 2' },
+          ];
+          pregunta.config = pregunta.config && typeof pregunta.config === 'object' ? pregunta.config : {};
+          sincronizarRelaciones(pregunta);
+        } else if (nuevoTipo === 'escala') {
+          pregunta.opciones = [];
+          pregunta.correctas = [];
+          pregunta.config = pregunta.config && typeof pregunta.config === 'object' ? pregunta.config : {};
+          pregunta.config.escala = {
+            min: 1,
+            max: 5,
+            step: 1,
+            etiquetaMin: 'Nivel inicial',
+            etiquetaMax: 'Nivel avanzado',
+          };
+        }
+        renderQuestions();
+      }
+
+      function inicializarDragAndDrop() {
+        let dragged;
+        questionsContainer.addEventListener('dragstart', event => {
+          const card = event.target.closest('.question-card');
+          if (!card) {
+            return;
+          }
+          dragged = card;
+          card.classList.add('dragging');
+          event.dataTransfer.effectAllowed = 'move';
+        });
+
+        questionsContainer.addEventListener('dragover', event => {
+          event.preventDefault();
+          const card = event.target.closest('.question-card');
+          if (!card || card === dragged) {
+            return;
+          }
+          const bounding = card.getBoundingClientRect();
+          const offset = event.clientY - bounding.top;
+          const shouldPlaceAfter = offset > bounding.height / 2;
+          if (shouldPlaceAfter) {
+            card.after(dragged);
+          } else {
+            card.before(dragged);
+          }
+        });
+
+        questionsContainer.addEventListener('drop', event => {
+          event.preventDefault();
+        });
+
+        questionsContainer.addEventListener('dragend', () => {
+          if (!dragged) {
+            return;
+          }
+          dragged.classList.remove('dragging');
+          const orden = Array.from(questionsContainer.querySelectorAll('.question-card')).map(card => card.dataset.uid);
+          estado.current.preguntas.sort((a, b) => orden.indexOf(a.uid) - orden.indexOf(b.uid));
+          dragged = null;
+          renderQuestions();
+        });
+      }
+
+      function guardarQuiz() {
+        if (!estado.current) {
+          return;
+        }
+        const quizId = quizIdInput.value.trim();
+        const titulo = tituloInput.value.trim();
+        const duracionMin = Number(duracionInput.value) || 0;
+        const cursoDestino = cursoInput.value.trim();
+
+        if (!quizId) {
+          mostrarStatus('El identificador es obligatorio.', 'error');
+          return;
+        }
+        if (estado.isNew && estado.quizzes.some(q => q.quizId === quizId)) {
+          mostrarStatus('Ya existe un cuestionario con ese identificador.', 'error');
+          return;
+        }
+        if (!/^[-_\w]+$/.test(quizId)) {
+          mostrarStatus('El identificador solo puede contener letras, números, guiones y guion bajo.', 'error');
+          return;
+        }
+        if (!titulo) {
+          mostrarStatus('Indica un título para el cuestionario.', 'error');
+          return;
+        }
+        if (!estado.current.preguntas.length) {
+          mostrarStatus('Añade al menos una pregunta.', 'error');
+          return;
+        }
+
+        const escapeValidation = validarEscapeConfig(estado.current.escapeConfig);
+        if (!escapeValidation.ok) {
+          mostrarStatus(escapeValidation.mensaje, 'error');
+          return;
+        }
+        estado.current.escapeConfig = escapeValidation.config;
+        const escapePayload = buildEscapePayload(estado.current.escapeConfig);
+
+        const payload = {
+          quizId,
+          titulo,
+          duracionMin,
+          cursoDestino,
+          escapeConfig: escapePayload,
+          preguntas: estado.current.preguntas.map((pregunta, index) => prepararPreguntaParaGuardar(pregunta, index)),
+        };
+
+        mostrarStatus('Guardando…', 'info');
+        google.script.run
+          .withSuccessHandler(res => {
+            mostrarStatus(res && res.mensaje ? res.mensaje : 'Guardado correctamente.', 'success');
+            estado.current.quizId = quizId;
+            estado.current.titulo = titulo;
+            estado.current.duracionMin = duracionMin;
+            estado.current.cursoDestino = cursoDestino;
+            if (res && res.escapeConfig) {
+              estado.current.escapeConfig = mapEscapeConfigFromServer(res.escapeConfig);
+              sincronizarCamposBloqueo();
+            }
+            estado.isNew = false;
+            quizIdInput.readOnly = true;
+            cargarCuestionarios();
+          })
+          .withFailureHandler(err => mostrarStatus(err.message || 'No se pudo guardar el cuestionario.', 'error'))
+          .guardarQuizCompleto(payload);
+      }
+
+      function prepararPreguntaParaGuardar(pregunta, index) {
+        const base = {
+          numero: index + 1,
+          texto: (pregunta.texto || '').trim(),
+          tipo: pregunta.tipo,
+          puntaje: Number(pregunta.puntaje) || 0,
+        };
+
+        if (pregunta.tipo === 'radio' || pregunta.tipo === 'opcion' || pregunta.tipo === 'checkbox') {
+          const opciones = pregunta.opciones.map(op => op.texto.trim()).filter(Boolean);
+          const mapa = new Map();
+          pregunta.opciones.forEach(op => {
+            mapa.set(op.uid, op.texto.trim());
+          });
+          const correctas = pregunta.correctas
+            .map(id => mapa.get(id))
+            .filter(Boolean);
+          return { ...base, opciones, correctas, config: {} };
+        }
+
+        if (pregunta.tipo === 'texto') {
+          const correctas = Array.isArray(pregunta.correctas)
+            ? pregunta.correctas.map(valor => valor.trim()).filter(Boolean)
+            : [];
+          return { ...base, opciones: [], correctas, config: {} };
+        }
+
+        if (pregunta.tipo === 'parrafo') {
+          return { ...base, opciones: [], correctas: [], config: {} };
+        }
+
+        if (pregunta.tipo === 'relacion') {
+          const relaciones = Array.isArray(pregunta.relaciones) ? pregunta.relaciones : [];
+          const pares = relaciones
+            .map(par => ({
+              izquierda: (par && par.izquierda ? par.izquierda : '').trim(),
+              derecha: (par && par.derecha ? par.derecha : '').trim(),
+            }))
+            .filter(par => par.izquierda && par.derecha);
+          const opciones = pares.map(par => par.izquierda);
+          const correctas = pares.map(par => par.derecha);
+          return { ...base, opciones, correctas, config: { relaciones: pares } };
+        }
+
+        if (pregunta.tipo === 'escala') {
+          const escala = (pregunta.config && pregunta.config.escala) || {};
+          const min = Number(escala.min);
+          const max = Number(escala.max);
+          const step = escala.step !== undefined ? Number(escala.step) : 1;
+          const escalaLimpia = {
+            min: isFinite(min) ? min : 1,
+            max: isFinite(max) && max > (isFinite(min) ? min : 1) ? max : Math.max((isFinite(min) ? min : 1) + 4, 5),
+            step: isFinite(step) && step > 0 ? step : 1,
+            etiquetaMin: (escala.etiquetaMin || '').toString(),
+            etiquetaMax: (escala.etiquetaMax || '').toString(),
+          };
+          return { ...base, opciones: [], correctas: [], config: { escala: escalaLimpia } };
+        }
+
+        return { ...base, opciones: [], correctas: [], config: {} };
+      }
+
+      function actualizarEnlaces() {
+        mostrarStatus('Generando enlaces…', 'info');
+        google.script.run
+          .withSuccessHandler(msg => {
+            mostrarStatus(msg || 'Enlaces actualizados.', 'success');
+            cargarCuestionarios();
+          })
+          .withFailureHandler(err => mostrarStatus(err.message || 'No se pudieron generar los enlaces.', 'error'))
+          .generarEnlaces();
+      }
+
+      function eliminarQuizActual() {
+        if (!estado.current || !estado.current.quizId) {
+          return;
+        }
+        const confirmado = confirm('¿Seguro que deseas eliminar este cuestionario? No se borrarán los resultados históricos.');
+        if (!confirmado) {
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(res => {
+            mostrarStatus(res && res.mensaje ? res.mensaje : 'Cuestionario eliminado.', 'success');
+            estado.current = null;
+            estado.isNew = true;
+            quizForm.classList.add('hidden');
+            emptyState.style.display = 'block';
+            cargarCuestionarios();
+          })
+          .withFailureHandler(err => mostrarStatus(err.message || 'No se pudo eliminar el cuestionario.', 'error'))
+          .eliminarQuiz(estado.current.quizId);
+      }
+
+      function defaultEscapeConfig() {
+        return {
+          accion: 'PENALIZACION',
+          unidad: 'PORCENTAJE',
+          cantidad: 10,
+          maxSalidas: 2,
+        };
+      }
+
+      function parseEscapeValor(valor) {
+        const base = { cantidad: 10, unidad: 'PORCENTAJE' };
+        if (!valor && valor !== 0) {
+          return base;
+        }
+        const text = valor.toString().trim();
+        if (!text) {
+          return base;
+        }
+        const lower = text.toLowerCase();
+        const porcentajeMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*%$/);
+        if (porcentajeMatch) {
+          const num = parseFloat(porcentajeMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : base.cantidad,
+            unidad: 'PORCENTAJE',
+          };
+        }
+        const minutosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(m|min|mins|minutos)$/);
+        if (minutosMatch) {
+          const num = parseFloat(minutosMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : 1,
+            unidad: 'MINUTOS',
+          };
+        }
+        const segundosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(s|seg|segundos)$/);
+        if (segundosMatch) {
+          const num = parseFloat(segundosMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : 30,
+            unidad: 'SEGUNDOS',
+          };
+        }
+        const numero = parseFloat(text.replace(',', '.'));
+        if (isFinite(numero) && numero > 0) {
+          return {
+            cantidad: numero,
+            unidad: 'MINUTOS',
+          };
+        }
+        return base;
+      }
+
+      function composeEscapeValor(config) {
+        if (!config || config.accion !== 'PENALIZACION') {
+          return '';
+        }
+        const numero = Number(config.cantidad);
+        if (!isFinite(numero) || numero <= 0) {
+          return '';
+        }
+        const limpio = Number.isInteger(numero) ? numero.toString() : numero.toFixed(2).replace(/\.0+$/, '').replace(/\.$/, '');
+        switch (config.unidad) {
+          case 'MINUTOS':
+            return `${limpio}m`;
+          case 'SEGUNDOS':
+            return `${limpio}s`;
+          default:
+            return `${limpio}%`;
+        }
+      }
+
+      function mapEscapeConfigFromServer(raw) {
+        const base = defaultEscapeConfig();
+        if (!raw || typeof raw !== 'object') {
+          return { ...base };
+        }
+        if ('unidad' in raw && 'cantidad' in raw) {
+          const cfg = { ...base, ...raw };
+          cfg.accion = (cfg.accion || base.accion).toString().toUpperCase();
+          cfg.unidad = cfg.unidad || base.unidad;
+          cfg.cantidad = isFinite(Number(cfg.cantidad)) && Number(cfg.cantidad) > 0 ? Number(cfg.cantidad) : base.cantidad;
+          cfg.maxSalidas = Math.max(1, Number(cfg.maxSalidas) || (cfg.accion === 'BLOQUEO' ? 1 : base.maxSalidas));
+          if (cfg.accion === 'BLOQUEO') {
+            cfg.maxSalidas = 1;
+          }
+          return cfg;
+        }
+
+        const accion = (raw.accion || base.accion).toString().toUpperCase();
+        const parsed = parseEscapeValor(raw.valor);
+        let maxSalidas = Math.max(1, Number(raw.maxSalidas) || (accion === 'BLOQUEO' ? 1 : base.maxSalidas));
+        if (accion === 'BLOQUEO') {
+          maxSalidas = 1;
+        }
+        return {
+          accion,
+          unidad: parsed.unidad,
+          cantidad: parsed.cantidad,
+          maxSalidas,
+        };
+      }
+
+      function buildEscapePayload(config) {
+        const cfg = mapEscapeConfigFromServer(config);
+        const payload = {
+          accion: cfg.accion,
+          maxSalidas: cfg.accion === 'BLOQUEO' ? 1 : Math.max(1, cfg.maxSalidas),
+        };
+        if (cfg.accion === 'PENALIZACION') {
+          payload.valor = composeEscapeValor(cfg);
+        } else {
+          payload.valor = '';
+        }
+        return payload;
+      }
+
+      function validarEscapeConfig(cfg) {
+        const config = mapEscapeConfigFromServer(cfg);
+        if (config.accion === 'PENALIZACION' && (!config.cantidad || config.cantidad <= 0)) {
+          return { ok: false, mensaje: 'Indica una duración válida para la penalización.' };
+        }
+        if (!config.maxSalidas || config.maxSalidas < 1) {
+          return { ok: false, mensaje: 'Indica el número de salidas permitidas (mínimo 1).' };
+        }
+        return { ok: true, config };
+      }
+
+      function sincronizarCamposBloqueo() {
+        if (!estado.current) {
+          const defecto = defaultEscapeConfig();
+          escapeActionSelect.value = defecto.accion;
+          escapeValueInput.value = defecto.cantidad;
+          escapeUnitSelect.value = defecto.unidad;
+          escapeMaxInput.value = defecto.maxSalidas;
+          actualizarCamposBloqueo();
+          return;
+        }
+        estado.current.escapeConfig = mapEscapeConfigFromServer(estado.current.escapeConfig);
+        const cfg = estado.current.escapeConfig;
+        escapeActionSelect.value = cfg.accion;
+        escapeValueInput.value = cfg.cantidad;
+        escapeUnitSelect.value = cfg.unidad;
+        escapeMaxInput.value = cfg.maxSalidas;
+        actualizarCamposBloqueo();
+      }
+
+      function actualizarCamposBloqueo() {
+        const cfg = estado.current ? estado.current.escapeConfig : defaultEscapeConfig();
+        const accion = cfg ? cfg.accion : 'PENALIZACION';
+        const esPenalizacion = accion === 'PENALIZACION';
+        escapeValueInput.disabled = !esPenalizacion;
+        escapeUnitSelect.disabled = !esPenalizacion;
+        if (accion === 'BLOQUEO') {
+          escapeMaxInput.disabled = true;
+          escapeMaxInput.value = 1;
+          if (estado.current) {
+            estado.current.escapeConfig.maxSalidas = 1;
+          }
+        } else {
+          escapeMaxInput.disabled = false;
+          if (estado.current && (!estado.current.escapeConfig.maxSalidas || estado.current.escapeConfig.maxSalidas < 1)) {
+            estado.current.escapeConfig.maxSalidas = accion === 'PENALIZACION' ? 2 : 1;
+            escapeMaxInput.value = estado.current.escapeConfig.maxSalidas;
+          }
+        }
+        if (esPenalizacion && estado.current && (!estado.current.escapeConfig.cantidad || estado.current.escapeConfig.cantidad <= 0)) {
+          estado.current.escapeConfig.cantidad = 10;
+          escapeValueInput.value = 10;
+        }
+        if (estado.current) {
+          estado.current.escapeConfig.unidad = escapeUnitSelect.value;
+        }
+      }
+
+      function mostrarStatus(mensaje, tipo) {
+        if (!mensaje) {
+            statusBox.className = 'status';
+            statusBox.textContent = '';
+            return;
+        }
+        statusBox.textContent = mensaje;
+        statusBox.className = 'status visible';
+        if (tipo === 'success') {
+          statusBox.classList.add('success');
+        } else if (tipo === 'error') {
+          statusBox.classList.add('error');
+        } else {
+          statusBox.classList.remove('success', 'error');
+        }
+      }
+
+      function crearPregunta() {
+        const opciones = [
+          { uid: generarUid('op'), texto: 'Opción A' },
+          { uid: generarUid('op'), texto: 'Opción B' },
+        ];
+        return {
+          uid: generarUid('q'),
+          texto: '',
+          tipo: 'radio',
+          puntaje: 1,
+          opciones,
+          correctas: [opciones[0].uid],
+          config: {},
+        };
+      }
+
+      function generarUid(prefijo) {
+        return `${prefijo}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-2)}`;
+      }
+
+      init();
+    </script>
+  </body>
+</html>

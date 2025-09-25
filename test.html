@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      :root {
+        color-scheme: light;
+        font-size: 16px;
+      }
+      body {
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(160deg, #eef2ff 0%, #f8f9fb 35%, #ffffff 100%);
+        color: #1f2933;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: min(5vw, 32px) min(4vw, 28px);
+      }
+      .app-shell {
+        width: min(720px, 100%);
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: clamp(1.6rem, 2vw + 1rem, 2.2rem);
+        margin: 0 0 0.75rem;
+        color: #0b3d6b;
+        letter-spacing: -0.02em;
+      }
+      form {
+        background: #fff;
+        padding: clamp(18px, 3vw, 28px);
+        border-radius: 18px;
+        box-shadow: 0 18px 36px rgba(17, 24, 39, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: clamp(14px, 2vw, 22px);
+      }
+      .penalty-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+      }
+      .penalty-dialog {
+        max-width: clamp(280px, 60vw, 520px);
+        width: 100%;
+        background: #ffffff;
+        border-radius: 20px;
+        padding: clamp(24px, 4vw, 36px);
+        box-shadow: 0 28px 60px rgba(0, 0, 0, 0.25);
+        text-align: center;
+      }
+      .penalty-dialog h2 {
+        margin: 0 0 16px;
+        font-size: clamp(1.4rem, 1.6vw + 1rem, 1.8rem);
+        color: #dc2626;
+        letter-spacing: -0.01em;
+      }
+      .penalty-dialog p {
+        margin: 0 0 12px;
+        font-size: clamp(1rem, 1.2vw + 0.8rem, 1.1rem);
+        color: #1f2933;
+        line-height: 1.5;
+      }
+      .penalty-warning {
+        color: #dc2626;
+        font-weight: 600;
+        margin-top: 16px;
+      }
+      .penalty-countdown {
+        margin-top: 18px;
+        font-weight: 700;
+        font-size: clamp(1.05rem, 1.4vw + 0.9rem, 1.2rem);
+        color: #1d4ed8;
+      }
+      .penalty-total {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f1f5f9;
+        border-radius: 12px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .timer-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .timer-label {
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .penalty-time {
+        color: #dc2626;
+        font-weight: 600;
+      }
+      .warning-btn {
+        margin-top: 20px;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
+      .warning-btn:hover {
+        transform: translateY(-1px);
+      }
+      
+      .penalty-disabled {
+        opacity: 0.7;
+        cursor: not-allowed !important;
+        background-color: rgba(241, 245, 249, 0.5) !important;
+        border-color: rgba(148, 163, 184, 0.2) !important;
+        pointer-events: none;
+      }
+      
+      .penalty-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        box-shadow: 0 10px 25px rgba(220, 38, 38, 0.1);
+        z-index: 1000;
+        animation: slideIn 0.3s ease-out;
+      }
+      
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .student-box {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px;
+        border-radius: 14px;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .student-box label {
+        font-weight: 600;
+        margin-bottom: 0;
+        font-size: 1.02rem;
+      }
+      .student-box select {
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        font-size: 1.05rem;
+        background: #fff;
+        color: inherit;
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+        min-height: 56px;
+      }
+      .student-meta {
+        font-size: 0.9rem;
+        color: #4b5563;
+      }
+      fieldset {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: clamp(12px, 2.4vw, 18px);
+        margin: 0;
+        border-radius: 14px;
+        background: rgba(248, 250, 252, 0.9);
+      }
+      legend {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1f2937;
+        margin-bottom: 10px;
+      }
+      label {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 12px;
+        line-height: 1.45;
+        font-size: 1.05rem;
+        cursor: pointer;
+        padding: 14px 18px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        transition: border 0.2s ease, background 0.2s ease;
+      }
+      label:hover,
+      label:focus-within {
+        border-color: rgba(59, 130, 246, 0.45);
+        background: rgba(59, 130, 246, 0.08);
+      }
+      .question-hint {
+        display: block;
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 10px;
+      }
+      .timer {
+        margin: 8px 0 12px;
+        padding: 14px 16px;
+        background: rgba(37, 99, 235, 0.12);
+        border-radius: 14px;
+        color: #1d4ed8;
+        font-weight: 600;
+        display: none;
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+      }
+      .matching-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .matching-row {
+        display: grid;
+        grid-template-columns: 1fr minmax(160px, 220px);
+        gap: 12px;
+        align-items: center;
+      }
+      .matching-row span {
+        font-weight: 600;
+        color: #1f2933;
+      }
+      .matching-row select {
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: #fff;
+        font-size: 1rem;
+      }
+      .scale-wrapper {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .scale-track {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .scale-track input[type="range"] {
+        flex: 1;
+      }
+      .scale-value {
+        font-weight: 600;
+        color: #1d4ed8;
+        min-width: 48px;
+        text-align: center;
+      }
+      .scale-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        color: #64748b;
+      }
+      button {
+        padding: 16px 22px;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        border: none;
+        border-radius: 12px;
+        color: #fff;
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        min-height: 60px;
+        box-shadow: 0 10px 20px rgba(37, 99, 235, 0.18);
+      }
+      button:disabled {
+        background: #cbd5f5;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 14px;
+        border-radius: 12px;
+        background: rgba(254, 226, 226, 0.9);
+        color: #b91c1c;
+        display: none;
+        border: 1px solid rgba(254, 202, 202, 0.9);
+      }
+      .status.success {
+        background: rgba(220, 252, 231, 0.92);
+        color: #047857;
+        border-color: rgba(187, 247, 208, 0.9);
+      }
+      .email-tag {
+        font-size: 0.92rem;
+        color: #4b5563;
+        margin-bottom: 12px;
+      }
+      textarea,
+      input[type="text"] {
+        width: 100%;
+        min-height: 48px;
+        resize: vertical;
+        font-family: inherit;
+        font-size: 1rem;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: #fff;
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+      }
+      textarea {
+        min-height: 140px;
+      }
+      .hidden {
+        display: none;
+      }
+      input[type="radio"],
+      input[type="checkbox"] {
+        width: 26px;
+        height: 26px;
+        margin-top: 0;
+        accent-color: #2563eb;
+        flex-shrink: 0;
+      }
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
+      }
+      button:not(:disabled):active {
+        transform: translateY(1px) scale(0.995);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18);
+      }
+      select:hover,
+      textarea:hover,
+      input[type="text"]:hover {
+        border-color: rgba(59, 130, 246, 0.45);
+      }
+      @media (max-width: 600px) {
+        body {
+          padding: 18px 14px 32px;
+        }
+        form {
+          border-radius: 16px;
+          box-shadow: 0 16px 32px rgba(17, 24, 39, 0.06);
+        }
+        .student-box {
+          padding: 14px;
+        }
+        legend {
+          font-size: 1.05rem;
+        }
+        label {
+          font-size: 1.08rem;
+        }
+        button {
+          font-size: 1.08rem;
+          min-height: 64px;
+        }
+      }
+      @media (pointer: coarse) {
+        input[type="radio"],
+        input[type="checkbox"] {
+          width: 30px;
+          height: 30px;
+        }
+        label {
+          gap: 20px;
+        }
+        select,
+        textarea,
+        input[type="text"] {
+          min-height: 64px;
+          font-size: 1.08rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <h1 id="titulo">Evaluación</h1>
+      <div class="email-tag" id="emailTag"></div>
+      <div class="timer" id="timerBox">Tiempo restante: <span id="timerValue">--:--</span></div>
+      <form id="testForm" class="hidden" novalidate>
+        <div id="studentBox" class="student-box hidden">
+          <label for="studentSelect">Selecciona al estudiante evaluado</label>
+          <select id="studentSelect" required>
+            <option value="">Selecciona un estudiante…</option>
+          </select>
+          <div class="student-meta" id="studentMeta"></div>
+        </div>
+        <div id="preguntas"></div>
+        <button type="submit">Enviar</button>
+      </form>
+      <div class="status" id="status"></div>
+    </div>
+    <div
+      class="penalty-overlay hidden"
+      id="penaltyOverlay"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-modal="true"
+      aria-labelledby="penaltyTitle"
+      aria-describedby="penaltyMessage penaltyCountdown penaltyWarning"
+    >
+      <div class="penalty-dialog">
+        <h2 id="penaltyTitle">Atención</h2>
+        <p id="penaltyMessage"></p>
+        <p class="penalty-countdown" id="penaltyCountdown"></p>
+        <p class="penalty-warning" id="penaltyWarning">Si vuelves a salir de la pantalla, el intento se bloqueará definitivamente.</p>
+      </div>
+    </div>
+
+    <script>
+      const quizId = ('<?= quizId ?>' || '').trim();
+      const origen = ('<?= origen ?>' || '').trim();
+
+      const form = document.getElementById('testForm');
+      const preguntasContainer = document.getElementById('preguntas');
+      const statusBox = document.getElementById('status');
+      const emailTag = document.getElementById('emailTag');
+      const timerBox = document.getElementById('timerBox');
+      const timerValue = document.getElementById('timerValue');
+      const titulo = document.getElementById('titulo');
+      const studentBox = document.getElementById('studentBox');
+      const studentSelect = document.getElementById('studentSelect');
+      const studentMeta = document.getElementById('studentMeta');
+      const penaltyOverlay = document.getElementById('penaltyOverlay');
+      const penaltyMessage = document.getElementById('penaltyMessage');
+      const penaltyCountdown = document.getElementById('penaltyCountdown');
+
+      const sessionStorageKey = quizId ? `quizSession:${quizId}` : '';
+      let sesionToken = '';
+      if (sessionStorageKey) {
+        try {
+          sesionToken = sessionStorage.getItem(sessionStorageKey) || '';
+        } catch (err) {
+          sesionToken = '';
+        }
+      }
+
+      let intentoBloqueado = false;
+      let preguntasDefinidas = [];
+      let timerInterval = null;
+      let tiempoTotalMs = null;
+      let tiempoRestanteMs = null;
+      let inicioCliente = null;
+      let reporteEnviado = false;
+      let envioEnProgreso = false;
+      let estudiantesDisponibles = [];
+      let alumnoSeleccionado = null;
+      let duracionCuestionarioMs = 0;
+      let idIntento = null; // Añadido para guardar el ID del intento
+
+      function configurarSelectorEstudiantes(estudiantes, alumnoPreseleccionado, cursoFiltro) {
+        estudiantesDisponibles = Array.isArray(estudiantes) ? estudiantes.slice() : [];
+
+        // Si hay un filtro de curso proporcionado, filtrar la lista
+        let listaFiltrada = estudiantesDisponibles;
+        if (cursoFiltro) {
+          const filtroNorm = cursoFiltro.toString().trim().toLowerCase();
+          listaFiltrada = estudiantesDisponibles.filter(s => (s.curso || '').toString().trim().toLowerCase() === filtroNorm);
+        }
+
+        // Limpiar select
+        studentSelect.innerHTML = '';
+
+        if (alumnoPreseleccionado && alumnoPreseleccionado.id) {
+          const option = document.createElement('option');
+          option.value = alumnoPreseleccionado.id;
+          option.textContent = alumnoPreseleccionado.nombre;
+          option.selected = true;
+          studentSelect.appendChild(option);
+          studentSelect.disabled = true;
+          alumnoSeleccionado = alumnoPreseleccionado;
+          studentMeta.textContent = alumnoPreseleccionado.curso ? `Curso: ${alumnoPreseleccionado.curso}` : '';
+          studentBox.classList.remove('hidden');
+          return;
+        }
+
+        if (!listaFiltrada || listaFiltrada.length === 0) {
+          // Mostrar mensaje útil cuando no hay estudiantes disponibles
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = cursoFiltro ? `No hay estudiantes para: ${cursoFiltro}` : 'No hay estudiantes disponibles';
+          studentSelect.appendChild(placeholder);
+          studentSelect.disabled = true;
+          studentMeta.textContent = cursoFiltro ? `Filtrado por curso: ${cursoFiltro}` : '';
+          studentBox.classList.remove('hidden');
+          return;
+        }
+
+        // Poblamos el select con la lista filtrada
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Selecciona un estudiante…';
+        studentSelect.appendChild(defaultOpt);
+
+        listaFiltrada.forEach(estudiante => {
+          const option = document.createElement('option');
+          option.value = estudiante.id;
+          const cursoText = estudiante.curso ? ` - ${estudiante.curso}` : '';
+          option.textContent = `${estudiante.nombre}${cursoText}`;
+          studentSelect.appendChild(option);
+        });
+
+        studentSelect.disabled = false;
+        studentSelect.onchange = (event) => {
+          const selectedId = event.target.value;
+          if (!selectedId) {
+            alumnoSeleccionado = null;
+            studentMeta.textContent = '';
+            return;
+          }
+          const estudiante = listaFiltrada.find(e => e.id === selectedId) || estudiantesDisponibles.find(e => e.id === selectedId);
+          if (estudiante) {
+            alumnoSeleccionado = estudiante;
+            studentMeta.textContent = estudiante.curso ? `Curso: ${estudiante.curso}` : '';
+            // Asignar estudiante en el servidor
+            google.script.run
+              .withSuccessHandler((resultado) => console.log('Estudiante asignado:', resultado))
+              .withFailureHandler((error) => {
+                console.error('Error al asignar estudiante:', error);
+                mostrarMensaje('Error al asignar el estudiante. Intenta de nuevo.', false, true);
+              })
+              .asignarEstudiante(quizId, selectedId, sesionToken);
+          }
+        };
+
+        if (cursoFiltro) {
+          studentMeta.textContent = `Filtrado por curso: ${cursoFiltro}`;
+        } else {
+          studentMeta.textContent = '';
+        }
+
+        studentBox.classList.remove('hidden');
+      }
+
+      function actualizarTokenCliente(token) {
+        sesionToken = token || '';
+        if (!sessionStorageKey) {
+          return;
+        }
+        try {
+          if (sesionToken) {
+            sessionStorage.setItem(sessionStorageKey, sesionToken);
+          } else {
+            sessionStorage.removeItem(sessionStorageKey);
+          }
+        } catch (err) {
+          // Ignorar errores de almacenamiento.
+        }
+      }
+
+      if (!quizId) {
+        mostrarMensaje('No se indicó ningún QuizId. Asegúrate de usar un enlace con ?quizId=ID o abre el test desde la hoja.', false, true);
+      } else {
+        solicitarEstado();
+      }
+
+      function solicitarEstado() {
+        google.script.run
+          .withSuccessHandler(setupQuiz)
+          .withFailureHandler(showError)
+          .obtenerEstado(quizId, sesionToken);
+      }
+
+    function setupQuiz(state) {
+      if (!state || !state.quiz) {
+        mostrarMensaje('No se pudo cargar el estado del cuestionario.', false, true);
+        return;
+      }
+
+      idIntento = state.idIntento; // Guardar el ID del intento
+
+      // Mover la lógica de escape aquí para que se inicialice después de cargar la configuración
+      window.quizConfig = state.quiz;
+      
+      // --- INICIO: LÓGICA DE DETECCIÓN DE SALIDA DE PANTALLA ---
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      // --- FIN: LÓGICA DE DETECCIÓN DE SALIDA DE PANTALLA ---
+
+      const quiz = state.quiz;
+      const preguntas = Array.isArray(quiz.preguntas) ? quiz.preguntas : [];
+      const tituloQuiz = quiz.titulo || 'Evaluación';
+
+      actualizarTokenCliente(state.sesionToken);
+
+      titulo.textContent = tituloQuiz;
+      emailTag.textContent = state.email ? `Sesión detectada: ${state.email}` : '';
+      
+      const duracionMin = typeof quiz.duracionMin !== 'undefined' ? Number(quiz.duracionMin) : 0;
+      duracionCuestionarioMs = Math.max(0, duracionMin) * 60 * 1000;
+
+      preguntasDefinidas = preguntas;
+      renderPreguntas(preguntasDefinidas);
+      form.classList.remove('hidden');
+      inicioCliente = Date.now();
+      mostrarMensaje('', true);
+
+      if (typeof state.tiempoRestanteMs === 'number' && state.tiempoRestanteMs >= 0) {
+        tiempoTotalMs = state.tiempoTotalMs;
+        tiempoRestanteMs = state.tiempoRestanteMs;
+        iniciarTemporizador();
+      } else {
+        tiempoTotalMs = null;
+        tiempoRestanteMs = null;
+        timerBox.style.display = 'none';
+      }
+
+      if (state.alumnoId && state.alumnoNombre) {
+        const alumnoInfo = {
+          id: state.alumnoId,
+          nombre: state.alumnoNombre,
+          curso: state.alumnoCurso || '',
+          email: state.email || '',
+        };
+        configurarSelectorEstudiantes([alumnoInfo], alumnoInfo, state.alumnoCurso || quiz.cursoDestino);
+      } else {
+        configurarSelectorEstudiantes(state.estudiantes || [], null, quiz.cursoDestino);
+      }
+    }
+
+    function showError(err) {
+      mostrarMensaje(err.message || 'Ocurrió un error desconocido.', false, true);
+    }
+
+      function handleVisibilityChange() {
+        if (!idIntento) return; // No hacer nada si no tenemos un intento
+
+        if (document.visibilityState === "hidden") {
+          // El usuario ha cambiado a otra pestaña o minimizado la ventana.
+          // Solo notificamos al servidor, sin esperar una respuesta compleja.
+          console.log("El usuario ha salido del quiz. Registrando escape...");
+          google.script.run
+            .withFailureHandler(function(error) {
+              console.error("Error al registrar el escape:", error);
+            })
+            .registrarEscape(idIntento);
+        } else {
+          // El usuario ha vuelto a la pestaña del quiz.
+          // Re-sincronizamos el estado con el servidor para obtener el tiempo restante actualizado.
+          console.log("El usuario ha vuelto al quiz. Sincronizando estado...");
+          google.script.run
+            .withSuccessHandler(function(estado) {
+              if (estado.bloqueado) {
+                mostrarMensajeBloqueo(estado.mensajeBloqueo);
+                return;
+              }
+              // Actualizamos el tiempo restante con el valor del servidor y reiniciamos el contador.
+              console.log("Estado sincronizado. Tiempo restante:", estado.tiempoRestanteMs);
+              tiempoRestanteMs = estado.tiempoRestanteMs;
+              iniciarTemporizador(); // Reinicia el contador con el nuevo tiempo
+            })
+            .withFailureHandler(function(error) {
+              console.error("Error al re-sincronizar el estado:", error);
+              mostrarError("Error de comunicación con el servidor al volver al quiz.");
+            })
+            .obtenerEstado(quizId, sesionToken); // Usamos el token de sesión actual
+        }
+      }
+
+      function mostrarMensajeBloqueo(mensaje) {
+        detenerTemporizador();
+        form.classList.add('hidden');
+        statusBox.classList.remove('success');
+        statusBox.innerHTML = `<strong>Intento bloqueado.</strong><br>${mensaje}`;
+        statusBox.style.display = 'block';
+        document.body.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      function renderPreguntas(lista) {
+        preguntasContainer.innerHTML = '';
+        if (!lista.length) {
+          preguntasContainer.innerHTML = '<p>No hay preguntas configuradas.</p>';
+          return;
+        }
+
+        lista.forEach((pregunta, indice) => {
+          const order = isFinite(pregunta.numero) ? Number(pregunta.numero) : indice + 1;
+          const tipo = (pregunta.tipo || 'texto').toString().toLowerCase();
+          const puntaje = Number(pregunta.puntaje);
+          const fieldset = document.createElement('fieldset');
+          const legend = document.createElement('legend');
+          const puntosTexto = puntaje > 0 ? ` (${puntaje === 1 ? '1 punto' : puntaje + ' puntos'})` : '';
+          legend.textContent = `${order}. ${pregunta.texto}${puntosTexto}`;
+          fieldset.appendChild(legend);
+
+          if (tipo === 'checkbox') {
+            const hint = document.createElement('span');
+            hint.className = 'question-hint';
+            hint.textContent = 'Selecciona todas las respuestas correctas.';
+            fieldset.appendChild(hint);
+          }
+
+          const name = `q${order}`;
+          const config = pregunta && typeof pregunta.config === 'object' ? pregunta.config : {};
+          if ((tipo === 'radio' || tipo === 'opcion') && pregunta.opciones && pregunta.opciones.length) {
+            pregunta.opciones.forEach(opcion => {
+              const label = document.createElement('label');
+              const input = document.createElement('input');
+              input.type = 'radio';
+              input.name = name;
+              input.value = opcion;
+              input.required = true;
+              label.appendChild(input);
+              label.appendChild(document.createTextNode(` ${opcion}`));
+              fieldset.appendChild(label);
+            });
+          } else if (tipo === 'checkbox' && pregunta.opciones && pregunta.opciones.length) {
+            pregunta.opciones.forEach(opcion => {
+              const label = document.createElement('label');
+              const input = document.createElement('input');
+              input.type = 'checkbox';
+              input.name = name;
+              input.value = opcion;
+              label.appendChild(input);
+              label.appendChild(document.createTextNode(` ${opcion}`));
+              fieldset.appendChild(label);
+            });
+          } else if (tipo === 'relacion') {
+            const relaciones = Array.isArray(config.relaciones)
+              ? config.relaciones
+              : (pregunta.opciones || []).map((izquierda, idx) => ({ izquierda, derecha: (pregunta.correctas || [])[idx] }));
+            if (relaciones.length) {
+              const aviso = document.createElement('span');
+              aviso.className = 'question-hint';
+              aviso.textContent = 'Relaciona cada elemento de la izquierda con su coincidencia de la derecha.';
+              fieldset.appendChild(aviso);
+              const container = document.createElement('div');
+              container.className = 'matching-container';
+              const opcionesDerecha = relaciones.map(rel => (rel && rel.derecha) || '').filter(Boolean);
+              const opcionesMezcladas = mezclarOpciones(opcionesDerecha.slice());
+              relaciones.forEach((rel, idx) => {
+                const fila = document.createElement('div');
+                fila.className = 'matching-row';
+                const etiqueta = document.createElement('span');
+                etiqueta.textContent = rel.izquierda || `Elemento ${idx + 1}`;
+                const select = document.createElement('select');
+                select.name = `${name}_${idx}`;
+                select.dataset.relacion = name;
+                select.required = true;
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Selecciona…';
+                select.appendChild(placeholder);
+                opcionesMezcladas.forEach(valor => {
+                  const option = document.createElement('option');
+                  option.value = valor;
+                  option.textContent = valor;
+                  select.appendChild(option);
+                });
+                fila.appendChild(etiqueta);
+                fila.appendChild(select);
+                container.appendChild(fila);
+              });
+              fieldset.appendChild(container);
+            } else {
+              const texto = document.createElement('p');
+              texto.textContent = 'No se configuraron elementos para relacionar.';
+              fieldset.appendChild(texto);
+            }
+          } else if (tipo === 'parrafo') {
+            const textarea = document.createElement('textarea');
+            textarea.name = name;
+            textarea.required = true;
+            textarea.placeholder = 'Escribe tu respuesta';
+            fieldset.appendChild(textarea);
+          } else if (tipo === 'escala') {
+            const escala = config.escala || {};
+            const min = isFinite(Number(escala.min)) ? Number(escala.min) : 1;
+            const max = isFinite(Number(escala.max)) && Number(escala.max) > min ? Number(escala.max) : min + 4;
+            const step = isFinite(Number(escala.step)) && Number(escala.step) > 0 ? Number(escala.step) : 1;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'scale-wrapper';
+
+            const labels = document.createElement('div');
+            labels.className = 'scale-labels';
+            const etiquetaMin = (escala.etiquetaMin || '').toString() || `(${min})`;
+            const etiquetaMax = (escala.etiquetaMax || '').toString() || `(${max})`;
+            const labelMinSpan = document.createElement('span');
+            labelMinSpan.textContent = etiquetaMin;
+            const labelMaxSpan = document.createElement('span');
+            labelMaxSpan.textContent = etiquetaMax;
+            labels.appendChild(labelMinSpan);
+            labels.appendChild(labelMaxSpan);
+
+            const track = document.createElement('div');
+            track.className = 'scale-track';
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.name = name;
+            slider.dataset.scale = name;
+            slider.min = String(min);
+            slider.max = String(max);
+            slider.step = String(step);
+            slider.value = String(min);
+            const valueDisplay = document.createElement('span');
+            valueDisplay.className = 'scale-value';
+            valueDisplay.textContent = slider.value;
+            slider.addEventListener('input', () => {
+              valueDisplay.textContent = slider.value;
+            });
+            track.appendChild(slider);
+            track.appendChild(valueDisplay);
+
+            wrapper.appendChild(track);
+            wrapper.appendChild(labels);
+            fieldset.appendChild(wrapper);
+          } else {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = name;
+            input.required = true;
+            input.placeholder = 'Escribe tu respuesta';
+            fieldset.appendChild(input);
+          }
+
+          preguntasContainer.appendChild(fieldset);
+        });
+      }
+
+      function iniciarTemporizador() {
+        if (timerInterval) {
+          clearInterval(timerInterval);
+        }
+        actualizarTimerVisual();
+        timerBox.style.display = 'block';
+        timerInterval = setInterval(() => {
+          tiempoRestanteMs -= 1000;
+          if (tiempoRestanteMs <= 0) {
+            detenerTemporizador();
+            tiempoRestanteMs = 0;
+            actualizarTimerVisual();
+            // El envío por tiempo agotado se gestionará en el servidor,
+            // aquí solo enviamos las respuestas actuales.
+            console.log("El tiempo se ha agotado. Enviando respuestas...");
+            form.requestSubmit();
+          } else {
+            actualizarTimerVisual();
+          }
+        }, 1000);
+      }
+
+      function detenerTemporizador() {
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+      }
+
+      function reportarBloqueo(motivo) {
+        const mensaje = motivo || 'Bloqueo del intento';
+        try {
+          google.script.run
+            .withSuccessHandler(() => {
+              bloquear(mensaje);
+            })
+            .withFailureHandler(() => {
+              bloquear(mensaje);
+            })
+            .registrarEscape(quizId, mensaje, sesionToken);
+        } catch (e) {
+          bloquear(mensaje);
+        }
+      }
+
+      function actualizarTimerVisual() {
+        const totalSeconds = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        timerValue.textContent = `${pad(minutes)}:${pad(seconds)}`;
+      }
+
+      function pad(value) {
+        return value < 10 ? `0${value}` : value;
+      }
+
+      function formatearDuracion(ms) {
+        if (!ms || ms <= 0) {
+          return '00:00';
+        }
+        const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+          return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+        return `${pad(minutes)}:${pad(seconds)}`;
+      }
+
+      function parseEscapeValor(valor) {
+        const base = { cantidad: 10, unidad: 'PORCENTAJE' };
+        if (!valor && valor !== 0) {
+          return base;
+        }
+        const text = valor.toString().trim();
+        if (!text) {
+          return base;
+        }
+        const lower = text.toLowerCase();
+        const porcentajeMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*%$/);
+        if (porcentajeMatch) {
+          const num = parseFloat(porcentajeMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : base.cantidad,
+            unidad: 'PORCENTAJE',
+          };
+        }
+        const minutosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(m|min|mins|minutos)$/);
+        if (minutosMatch) {
+          const num = parseFloat(minutosMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : 1,
+            unidad: 'MINUTOS',
+          };
+        }
+        const segundosMatch = lower.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(s|seg|segundos)$/);
+        if (segundosMatch) {
+          const num = parseFloat(segundosMatch[1].replace(',', '.'));
+          return {
+            cantidad: isFinite(num) && num > 0 ? num : 30,
+            unidad: 'SEGUNDOS',
+          };
+        }
+        const numero = parseFloat(text.replace(',', '.'));
+        if (isFinite(numero) && numero > 0) {
+          return {
+            cantidad: numero,
+            unidad: 'MINUTOS',
+          };
+        }
+        return base;
+      }
+
+      function calcularPenalizacionPorDefecto(referenciaMs) {
+        // Usar el 10% del tiempo total como penalización base, mínimo 30 segundos
+        const base = referenciaMs && referenciaMs > 0 ? referenciaMs : 60000;
+        return Math.max(30000, Math.round(base * 0.1));
+      }
+
+      function normalizarEscapePolicy(rawConfig, referenciaMs) {
+        // Política por defecto: PENALIZACIÓN
+        const baseAccion = (rawConfig && rawConfig.accion ? rawConfig.accion : 'PENALIZACION').toString().toUpperCase();
+        
+        // Calcular número máximo de salidas permitidas
+        let maxSalidas = Math.max(1, Number(rawConfig && rawConfig.maxSalidas) || (baseAccion === 'BLOQUEO' ? 1 : 3));
+        if (baseAccion === 'BLOQUEO') {
+          maxSalidas = 1; // Si la acción es bloqueo, siempre es 1
+        }
+
+        let penalizacionMs = 0;
+        let descripcion = '';
+        if (baseAccion === 'PENALIZACION') {
+          const parsed = parseEscapeValor(rawConfig && rawConfig.valor);
+          if (parsed.unidad === 'PORCENTAJE') {
+            const referencia = referenciaMs && referenciaMs > 0 ? referenciaMs : 60000;
+            penalizacionMs = Math.max(1000, Math.round(referencia * (parsed.cantidad / 100)));
+            descripcion = `${parsed.cantidad}% del tiempo total`;
+          } else if (parsed.unidad === 'MINUTOS') {
+            penalizacionMs = Math.max(1000, parsed.cantidad * 60000);
+            descripcion = `${parsed.cantidad} minuto${parsed.cantidad === 1 ? '' : 's'}`;
+          } else if (parsed.unidad === 'SEGUNDOS') {
+            penalizacionMs = Math.max(1000, parsed.cantidad * 1000);
+            descripcion = `${parsed.cantidad} segundo${parsed.cantidad === 1 ? '' : 's'}`;
+          }
+          if (!penalizacionMs || penalizacionMs <= 0) {
+            penalizacionMs = calcularPenalizacionPorDefecto(referenciaMs);
+            descripcion = '10% del tiempo total';
+          }
+        } else if (baseAccion === 'ADVERTENCIA') {
+          descripcion = (rawConfig && rawConfig.valor ? rawConfig.valor : 'Advertencia registrada');
+        }
+
+        return {
+          accion: baseAccion,
+          penalizacionMs,
+          descripcion,
+          maxSalidas,
+        };
+      }
+
+      function mezclarOpciones(lista) {
+        const array = Array.isArray(lista) ? lista.slice() : [];
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function setFormTemporalDisabled(desactivar) {
+        const controles = form.querySelectorAll('input, textarea, button, select');
+        
+        controles.forEach(control => {
+          if (desactivar) {
+            // Guardar el estado actual antes de deshabilitar
+            if (!control.dataset.penaltyState) {
+              control.dataset.penaltyState = control.disabled ? 'locked' : 'active';
+              
+              // Añadir clase visual para elementos deshabilitados
+              control.classList.add('penalty-disabled');
+            }
+            control.disabled = true;
+            
+            // Agregar tooltip explicativo
+            control.title = 'Control deshabilitado temporalmente por penalización';
+          } else if (control.dataset.penaltyState) {
+            // Restaurar estado original
+            if (control.dataset.penaltyState === 'active') {
+              control.disabled = false;
+              control.classList.remove('penalty-disabled');
+              control.title = '';
+            }
+            delete control.dataset.penaltyState;
+          }
+        });
+      }
+
+      function mostrarNotificacionPenalizacion(mensaje, duracionMs = 5000) {
+        const notif = document.createElement('div');
+        notif.className = 'penalty-notification';
+        notif.textContent = mensaje;
+        document.body.appendChild(notif);
+        
+        setTimeout(() => {
+          notif.style.animation = 'slideIn 0.3s ease-out reverse';
+          setTimeout(() => notif.remove(), 300);
+        }, duracionMs);
+      }
+
+      function actualizarMensajePenalizacion(restanteMs) {
+        const totalTexto = formatearDuracion(penalizacionTotalMs);
+        const restanteTexto = formatearDuracion(Math.max(0, restanteMs));
+        
+        // Crear o actualizar el contenedor del temporizador
+        let timerContainer = document.querySelector('.timer-container');
+        if (!timerContainer) {
+          timerContainer = document.createElement('div');
+          timerContainer.className = 'timer-container';
+          form.insertBefore(timerContainer, form.firstChild);
+        }
+        
+        // Actualizar el contenido del temporizador
+        timerContainer.innerHTML = `
+          <div class="timer-label">Penalización actual:</div>
+          <div class="penalty-time">${restanteTexto}</div>
+          <div class="timer-label">Total acumulado:</div>
+          <div class="penalty-time">${totalTexto}</div>
+        `;
+
+        // Actualizar el overlay de penalización
+        const overlay = document.createElement('div');
+        overlay.className = 'penalty-overlay';
+        overlay.id = 'penaltyOverlay';
+        
+        const dialog = document.createElement('div');
+        dialog.className = 'penalty-dialog';
+        dialog.innerHTML = `
+          <h2>Penalización por Salida</h2>
+          <p>Se ha detectado que ha salido del cuestionario.</p>
+          <p>Se aplicará una penalización temporal.</p>
+          <div class="penalty-total">
+            Tiempo de penalización: ${totalTexto}
+            <br>
+            <span class="penalty-countdown">Tiempo restante: ${restanteTexto}</span>
+          </div>
+          <button class="warning-btn" onclick="this.closest('.penalty-overlay').remove()">Entendido</button>
+        `;
+        
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+      }
+
+      function detenerPenalizacionTemporal(opciones = {}) {
+        const { restaurarControles = true, mostrarFin = false } = opciones;
+        if (penalizacionIntervalId) {
+          clearInterval(penalizacionIntervalId);
+          penalizacionIntervalId = null;
+        }
+
+        const estabaActiva = penalizacionActiva;
+        penalizacionActiva = false;
+        penalizacionFinTimestamp = null;
+        penalizacionTotalMs = 0;
+
+        penaltyOverlay.classList.add('hidden');
+        penaltyMessage.textContent = '';
+        penaltyCountdown.textContent = '';
+
+        if (restaurarControles) {
+          setFormTemporalDisabled(false);
+        } else {
+          form.querySelectorAll('[data-penalty-state]').forEach(control => {
+            delete control.dataset.penaltyState;
+          });
+        }
+
+        if (estabaActiva && mostrarFin && !intentoBloqueado) {
+          mostrarMensaje('Penalización finalizada. Si vuelves a abandonar la pantalla, el intento se bloqueará.', false, true);
+        }
+      }
+
+      function aplicarPenalizacionTemporal() {
+        if (penalizacionActiva || intentoBloqueado) {
+          return;
+        }
+        salidaAdvertida = true;
+
+        const baseTotal = duracionCuestionarioMs && duracionCuestionarioMs > 0 ? duracionCuestionarioMs : 10 * 60 * 1000;
+        let penalizacionMs = Math.max(1000, Math.round(baseTotal * 0.1));
+        if (typeof tiempoRestanteMs === 'number' && tiempoRestanteMs > 0) {
+          penalizacionMs = Math.min(penalizacionMs, Math.max(1000, tiempoRestanteMs));
+        }
+
+        penalizacionActiva = true;
+        penalizacionTotalMs = penalizacionMs;
+        penalizacionFinTimestamp = Date.now() + penalizacionMs;
+
+        setFormTemporalDisabled(true);
+        actualizarMensajePenalizacion(penalizacionMs);
+
+        if (penalizacionIntervalId) {
+          clearInterval(penalizacionIntervalId);
+        }
+        penalizacionIntervalId = setInterval(() => {
+          const restante = penalizacionFinTimestamp - Date.now();
+          if (restante <= 0) {
+            detenerPenalizacionTemporal({ restaurarControles: true, mostrarFin: true });
+            return;
+          }
+          actualizarMensajePenalizacion(restante);
+        }, 250);
+      }
+
+      function bloquear(mensaje) {
+        intentoBloqueado = true;
+        detenerTemporizador();
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+          btn.disabled = true;
+        }
+        mostrarMensaje(mensaje, false, true);
+      }
+
+      function mostrarMensaje(texto, esExito, esPermanente = false) {
+        if (!texto && !esPermanente) {
+          statusBox.style.display = 'none';
+          statusBox.textContent = '';
+          statusBox.classList.remove('success');
+          return;
+        }
+        statusBox.textContent = texto;
+        statusBox.style.display = 'block';
+        if (esExito) {
+          statusBox.classList.add('success');
+        } else {
+          statusBox.classList.remove('success');
+        }
+      }
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (envioEnProgreso) return;
+        if (intentoBloqueado) {
+          mostrarMensaje('El intento está bloqueado y no se puede enviar.', false, true);
+          return;
+        }
+
+        if (reporteEnviado) {
+          mostrarMensaje('Las respuestas ya han sido enviadas.', false, true);
+          return;
+        }
+
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+          btn.disabled = true;
+        }
+        envioEnProgreso = true;
+        mostrarMensaje('Enviando respuestas...', true);
+
+        const respuestas = [];
+        const formData = new FormData(form);
+        const preguntasRespondidas = new Set();
+
+        for (const [key, value] of formData.entries()) {
+          const match = key.match(/^q(\d+)(?:_(\d+))?$/);
+          if (!match) continue;
+
+          const numPregunta = parseInt(match[1], 10);
+          preguntasRespondidas.add(numPregunta);
+
+          const preguntaDef = preguntasDefinidas.find(p => p.numero === numPregunta);
+          if (!preguntaDef) continue;
+
+          const tipo = (preguntaDef.tipo || 'texto').toLowerCase();
+
+          if (tipo === 'relacion') {
+            const indiceRelacion = parseInt(match[2], 10);
+            let respuestaExistente = respuestas.find(r => r.numero === numPregunta);
+            if (!respuestaExistente) {
+              respuestaExistente = { numero: numPregunta, respuesta: [] };
+              respuestas.push(respuestaExistente);
+            }
+            if (Array.isArray(respuestaExistente.respuesta)) {
+              respuestaExistente.respuesta[indiceRelacion] = value;
+            }
+          } else if (tipo === 'checkbox') {
+            let respuestaExistente = respuestas.find(r => r.numero === numPregunta);
+            if (!respuestaExistente) {
+              respuestaExistente = { numero: numPregunta, respuesta: [] };
+              respuestas.push(respuestaExistente);
+            }
+            if (Array.isArray(respuestaExistente.respuesta)) {
+              respuestaExistente.respuesta.push(value);
+            }
+          } else {
+            respuestas.push({ numero: numPregunta, respuesta: value });
+          }
+        }
+
+        preguntasDefinidas.forEach(pregunta => {
+          if (!preguntasRespondidas.has(pregunta.numero)) {
+            respuestas.push({ numero: pregunta.numero, respuesta: '' });
+          }
+        });
+
+        const duracionTotal = tiempoTotalMs && tiempoTotalMs > 0 ? tiempoTotalMs : duracionCuestionarioMs;
+        const tiempoEmpleado = duracionTotal - (tiempoRestanteMs || 0);
+
+        const datos = {
+          quizId,
+          sesionToken,
+          alumnoId: alumnoSeleccionado ? alumnoSeleccionado.id : null,
+          respuestas,
+          tiempoEmpleado,
+        };
+
+        google.script.run
+          .withSuccessHandler(function(resultado) {
+            envioEnProgreso = false;
+            reporteEnviado = true;
+            detenerTemporizador();
+            form.classList.add('hidden');
+            statusBox.classList.add('success');
+            statusBox.innerHTML = `<strong>¡Respuestas enviadas con éxito!</strong><br>${resultado.mensaje || ''}`;
+            statusBox.style.display = 'block';
+            document.body.scrollIntoView({ behavior: 'smooth' });
+            actualizarTokenCliente(null);
+          })
+          .withFailureHandler(function(err) {
+            envioEnProgreso = false;
+            mostrarMensaje(`Error al enviar: ${err.message}`, false, true);
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+              btn.disabled = false;
+            }
+          })
+          .registrarRespuestas(datos);
+      });
+    </script>
+  </body>
+</html>
