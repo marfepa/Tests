@@ -735,6 +735,43 @@ function guardarRespuestas(quizId, respuestas, tiempoEmpleadoMs, alumnoId, clien
       bloqueo: 'FINALIZADO',
     },
   );
+
+  const mensaje = requiereRevision
+    ? 'Tus respuestas se registraron correctamente y serán revisadas manualmente.'
+    : 'Tus respuestas se registraron correctamente.';
+
+  return {
+    mensaje,
+    requiereRevision,
+    puntajeObtenido,
+    puntajeMaximo: puntajeMax,
+    alumnoId: estudiante.id,
+    alumnoNombre: estudiante.nombre,
+  };
+}
+
+function registrarRespuestas(payload) {
+  const datos = payload && typeof payload === 'object' ? payload : {};
+
+  const quizId = datos.quizId || datos.cuestionarioId || datos.id || '';
+  const respuestas = Array.isArray(datos.respuestas) ? datos.respuestas : [];
+  const tiempoEmpleado = typeof datos.tiempoEmpleado === 'number'
+    ? datos.tiempoEmpleado
+    : typeof datos.tiempoEmpleadoMs === 'number'
+      ? datos.tiempoEmpleadoMs
+      : Number(datos.tiempoEmpleado) || Number(datos.tiempoEmpleadoMs) || 0;
+  const alumnoId = datos.alumnoId || datos.estudianteId || '';
+  const clientToken = datos.sesionToken || datos.tokenSesion || datos.clientToken || '';
+
+  const resultado = guardarRespuestas(quizId, respuestas, tiempoEmpleado, alumnoId, clientToken);
+
+  if (resultado && typeof resultado === 'object' && typeof resultado.mensaje === 'string') {
+    return resultado;
+  }
+
+  return {
+    mensaje: 'Tus respuestas fueron registradas correctamente.',
+  };
 }
 
 function registrarEscape(quizId, motivo, clientToken) {
