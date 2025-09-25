@@ -1099,25 +1099,35 @@
 
       function setFormTemporalDisabled(desactivar) {
         const controles = form.querySelectorAll('input, textarea, button, select');
-        
+
         controles.forEach(control => {
           if (desactivar) {
-            // Guardar el estado actual antes de deshabilitar
-            if (!control.dataset.penaltyState) {
-              control.dataset.penaltyState = control.disabled ? 'locked' : 'active';
-              
-              // Añadir clase visual para elementos deshabilitados
-              control.classList.add('penalty-disabled');
+            if (!control.dataset.penaltyPrevDisabled) {
+              control.dataset.penaltyPrevDisabled = control.disabled ? '1' : '0';
+              if (control.title) {
+                control.dataset.penaltyPrevTitle = control.title;
+              }
             }
+            control.classList.add('penalty-disabled');
             control.disabled = true;
-            
-            // Agregar tooltip explicativo
             control.title = 'Control deshabilitado temporalmente por penalización';
-          } else if (control.dataset.penaltyState) {
-            // Restaurar estado original
-            if (control.dataset.penaltyState === 'active') {
-              control.disabled = false;
-              control.classList.remove('penalty-disabled');
+          } else if (control.dataset.penaltyPrevDisabled) {
+            const estabaDeshabilitado = control.dataset.penaltyPrevDisabled === '1';
+            control.disabled = estabaDeshabilitado;
+            control.classList.remove('penalty-disabled');
+
+            if (Object.prototype.hasOwnProperty.call(control.dataset, 'penaltyPrevTitle')) {
+              control.title = control.dataset.penaltyPrevTitle;
+            } else if (control.title === 'Control deshabilitado temporalmente por penalización') {
+              control.title = '';
+            }
+
+            delete control.dataset.penaltyPrevDisabled;
+            delete control.dataset.penaltyPrevTitle;
+          } else {
+            // Limpieza de estados anteriores
+            control.classList.remove('penalty-disabled');
+            if (control.title === 'Control deshabilitado temporalmente por penalización') {
               control.title = '';
             }
             delete control.dataset.penaltyState;
@@ -1259,8 +1269,15 @@
         if (restaurarControles) {
           setFormTemporalDisabled(false);
         } else {
-          form.querySelectorAll('[data-penalty-state]').forEach(control => {
-            delete control.dataset.penaltyState;
+          form.querySelectorAll('[data-penalty-prev-disabled]').forEach(control => {
+            control.classList.remove('penalty-disabled');
+            if (Object.prototype.hasOwnProperty.call(control.dataset, 'penaltyPrevTitle')) {
+              control.title = control.dataset.penaltyPrevTitle;
+            } else if (control.title === 'Control deshabilitado temporalmente por penalización') {
+              control.title = '';
+            }
+            delete control.dataset.penaltyPrevDisabled;
+            delete control.dataset.penaltyPrevTitle;
           });
         }
 
