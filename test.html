@@ -486,6 +486,8 @@
       let escapesRegistrados = 0;
       let advertenciasRestantes = null;
       let escapeRegistroEnCurso = false;
+      let sincronizacionEstadoEnCurso = false;
+      let escapeListenersRegistrados = false;
 
       function configurarSelectorEstudiantes(estudiantes, alumnoPreseleccionado, cursoFiltro) {
         estudiantesDisponibles = Array.isArray(estudiantes) ? estudiantes.slice() : [];
@@ -610,7 +612,12 @@
       window.quizConfig = state.quiz;
       
       // --- INICIO: LÓGICA DE DETECCIÓN DE SALIDA DE PANTALLA ---
-      document.addEventListener('visibilitychange', handleVisibilityChange);
+      if (!escapeListenersRegistrados) {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleWindowBlur);
+        window.addEventListener('focus', handleWindowFocus);
+        escapeListenersRegistrados = true;
+      }
       // --- FIN: LÓGICA DE DETECCIÓN DE SALIDA DE PANTALLA ---
 
       const quiz = state.quiz;
@@ -668,57 +675,84 @@
         }
 
         if (document.visibilityState === 'hidden') {
-          if (escapeRegistroEnCurso) {
-            return;
-          }
-
-          escapeRegistroEnCurso = true;
-          console.log('El usuario ha salido del quiz. Registrando escape...');
-          google.script.run
-            .withSuccessHandler(function(respuesta) {
-              escapeRegistroEnCurso = false;
-              procesarRespuestaEscape(respuesta);
-            })
-            .withFailureHandler(function(error) {
-              escapeRegistroEnCurso = false;
-              console.error('Error al registrar el escape:', error);
-            })
-            .registrarEscape(quizId, 'Se detectó una salida de la pantalla.', sesionToken);
+          registrarEscapeDetectado('Se detectó una salida de la pantalla.', 'visibilitychange');
         } else if (document.visibilityState === 'visible') {
-          if (escapeRegistroEnCurso) {
-            return;
-          }
-          console.log('El usuario ha vuelto al quiz. Sincronizando estado...');
-          google.script.run
-            .withSuccessHandler(function(estado) {
-              if (estado.bloqueado) {
-                mostrarMensajeBloqueo(estado.motivo || 'El intento ha sido bloqueado.');
-                return;
-              }
-              if (estado.escapePolicy) {
-                escapePolicy = estado.escapePolicy;
-              }
-              if (typeof estado.salidasRegistradas === 'number') {
-                escapesRegistrados = estado.salidasRegistradas;
-              }
-              if (typeof estado.penalizacionAcumuladaMs === 'number') {
-                penalizacionAcumuladaMs = estado.penalizacionAcumuladaMs;
-              }
-              actualizarAdvertenciasRestantes(calcularAdvertenciasRestantes());
-              if (typeof estado.tiempoTotalMs === 'number') {
-                tiempoTotalMs = estado.tiempoTotalMs;
-              }
-              if (typeof estado.tiempoRestanteMs === 'number') {
-                tiempoRestanteMs = estado.tiempoRestanteMs;
-                iniciarTemporizador();
-              }
-            })
-            .withFailureHandler(function(error) {
-              console.error('Error al re-sincronizar el estado:', error);
-              mostrarMensaje('Error de comunicación con el servidor al volver al quiz.', false, true);
-            })
-            .obtenerEstado(quizId, sesionToken);
+          sincronizarEstadoIntento('visibilitychange');
         }
+      }
+
+      function handleWindowBlur() {
+        if (!quizId || intentoBloqueado || document.visibilityState === 'hidden') {
+          return;
+        }
+        registrarEscapeDetectado('Se detectó que abandonaste la ventana del cuestionario.', 'window.blur');
+      }
+
+      function handleWindowFocus() {
+        if (!quizId || intentoBloqueado || document.visibilityState === 'hidden') {
+          return;
+        }
+        sincronizarEstadoIntento('window.focus');
+      }
+
+      function registrarEscapeDetectado(motivo, origen) {
+        if (!quizId || intentoBloqueado || escapeRegistroEnCurso) {
+          return;
+        }
+
+        escapeRegistroEnCurso = true;
+        const mensaje = motivo || 'Se detectó una salida de la pantalla.';
+        console.log(`[${origen || 'escape'}] Registrando escape: ${mensaje}`);
+        google.script.run
+          .withSuccessHandler(function(respuesta) {
+            escapeRegistroEnCurso = false;
+            procesarRespuestaEscape(respuesta);
+          })
+          .withFailureHandler(function(error) {
+            escapeRegistroEnCurso = false;
+            console.error('Error al registrar el escape:', error);
+          })
+          .registrarEscape(quizId, mensaje, sesionToken);
+      }
+
+      function sincronizarEstadoIntento(origen) {
+        if (!quizId || intentoBloqueado || sincronizacionEstadoEnCurso) {
+          return;
+        }
+
+        sincronizacionEstadoEnCurso = true;
+        console.log(`[${origen || 'escape'}] Sincronizando estado del intento...`);
+        google.script.run
+          .withSuccessHandler(function(estado) {
+            sincronizacionEstadoEnCurso = false;
+            if (estado.bloqueado) {
+              mostrarMensajeBloqueo(estado.motivo || 'El intento ha sido bloqueado.');
+              return;
+            }
+            if (estado.escapePolicy) {
+              escapePolicy = estado.escapePolicy;
+            }
+            if (typeof estado.salidasRegistradas === 'number') {
+              escapesRegistrados = estado.salidasRegistradas;
+            }
+            if (typeof estado.penalizacionAcumuladaMs === 'number') {
+              penalizacionAcumuladaMs = estado.penalizacionAcumuladaMs;
+            }
+            actualizarAdvertenciasRestantes(calcularAdvertenciasRestantes());
+            if (typeof estado.tiempoTotalMs === 'number') {
+              tiempoTotalMs = estado.tiempoTotalMs;
+            }
+            if (typeof estado.tiempoRestanteMs === 'number') {
+              tiempoRestanteMs = estado.tiempoRestanteMs;
+              iniciarTemporizador();
+            }
+          })
+          .withFailureHandler(function(error) {
+            sincronizacionEstadoEnCurso = false;
+            console.error('Error al re-sincronizar el estado:', error);
+            mostrarMensaje('Error de comunicación con el servidor al volver al quiz.', false, true);
+          })
+          .obtenerEstado(quizId, sesionToken);
       }
 
       function mostrarMensajeBloqueo(mensaje) {
