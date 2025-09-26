@@ -1623,7 +1623,14 @@
           let texto = '';
 
           if (accion === 'PENALIZACION') {
-            const penalizacionTexto = formatearPenalizacion(policy);
+            const referenciaPenalizacionMs = state && typeof state.tiempoTotalMs === 'number' && state.tiempoTotalMs > 0
+              ? state.tiempoTotalMs
+              : duracionCuestionarioMs;
+            const penalizacionTexto = formatearPenalizacion(policy, {
+              quiz,
+              state,
+              referenciaMs: referenciaPenalizacionMs,
+            });
             texto = `Si abandonas la pantalla se aplicará una penalización temporal de ${penalizacionTexto} en la que no podrás contestar.`;
           } else if (accion === 'BLOQUEO') {
             texto = 'Abandonar la pantalla bloqueará el intento de manera inmediata.';
@@ -1794,18 +1801,87 @@
         });
       }
 
-      function formatearPenalizacion(policy) {
+      function formatearPenalizacion(policy, opciones = {}) {
         if (!policy || typeof policy !== 'object') {
           return 'una penalización definida por el docente';
         }
-        if (policy.descripcion) {
-          return policy.descripcion;
+
+        const quiz = opciones && opciones.quiz ? opciones.quiz : null;
+        const state = opciones && opciones.state ? opciones.state : null;
+        const referenciaMsOpcional = opciones && typeof opciones.referenciaMs === 'number' ? opciones.referenciaMs : null;
+        const penalizacionMs = Number(policy.penalizacionMs);
+        const descripcion = typeof policy.descripcion === 'string' ? policy.descripcion.trim() : '';
+
+        const referenciaMs = referenciaMsOpcional && referenciaMsOpcional > 0
+          ? referenciaMsOpcional
+          : state && typeof state.tiempoTotalMs === 'number' && state.tiempoTotalMs > 0
+            ? state.tiempoTotalMs
+            : duracionCuestionarioMs && duracionCuestionarioMs > 0
+              ? duracionCuestionarioMs
+              : null;
+
+        const rawConfig = quiz && quiz.escapeConfig ? quiz.escapeConfig : null;
+        const tieneValorConfig = rawConfig && Object.prototype.hasOwnProperty.call(rawConfig, 'valor');
+        const parsedConfig = tieneValorConfig ? parseEscapeValor(rawConfig.valor) : null;
+
+        const formatearDesdeMs = ms => formatearPenalizacionDesdeMs(ms);
+
+        if (parsedConfig && parsedConfig.unidad === 'PORCENTAJE') {
+          const porcentaje = Number(parsedConfig.cantidad);
+          if (isFinite(porcentaje) && porcentaje > 0) {
+            const equivalenteMs = isFinite(penalizacionMs) && penalizacionMs > 0
+              ? penalizacionMs
+              : referenciaMs && referenciaMs > 0
+                ? Math.round(referenciaMs * (porcentaje / 100))
+                : NaN;
+            const detalle = isFinite(equivalenteMs) && equivalenteMs > 0
+              ? ` (equivalente a ${formatearDesdeMs(equivalenteMs)})`
+              : '';
+            return `${porcentaje}% del tiempo total${detalle}`.trim();
+          }
         }
-        const ms = Number(policy.penalizacionMs);
-        if (!isFinite(ms) || ms <= 0) {
+
+        if (parsedConfig && parsedConfig.unidad === 'MINUTOS') {
+          const minutosMs = Number(parsedConfig.cantidad) * 60000;
+          if (isFinite(minutosMs) && minutosMs > 0) {
+            return formatearDesdeMs(minutosMs);
+          }
+        }
+
+        if (parsedConfig && parsedConfig.unidad === 'SEGUNDOS') {
+          const segundosMs = Number(parsedConfig.cantidad) * 1000;
+          if (isFinite(segundosMs) && segundosMs > 0) {
+            return formatearDesdeMs(segundosMs);
+          }
+        }
+
+        if (descripcion) {
+          if (penalizacionMs > 0) {
+            const lowerDesc = descripcion.toLowerCase();
+            if (lowerDesc.includes('%')) {
+              return `${descripcion}${lowerDesc.includes('equivalente') ? '' : ` (equivalente a ${formatearDesdeMs(penalizacionMs)})`}`.trim();
+            }
+            const tiempoMatch = lowerDesc.match(/^([-+]?\d+(?:[\.,]\d+)?)\s*(m|min|mins|minutos|s|seg|segundos)$/);
+            if (tiempoMatch) {
+              return `${formatearDesdeMs(penalizacionMs)} (${descripcion})`;
+            }
+          }
+          return descripcion;
+        }
+
+        if (isFinite(penalizacionMs) && penalizacionMs > 0) {
+          return formatearDesdeMs(penalizacionMs);
+        }
+
+        return 'una penalización temporal';
+      }
+
+      function formatearPenalizacionDesdeMs(ms) {
+        const milisegundos = Number(ms);
+        if (!isFinite(milisegundos) || milisegundos <= 0) {
           return 'una penalización temporal';
         }
-        const segundosTotales = Math.round(ms / 1000);
+        const segundosTotales = Math.round(milisegundos / 1000);
         if (segundosTotales < 60) {
           return pluralizar(segundosTotales, '1 segundo', `${segundosTotales} segundos`);
         }
