@@ -18,6 +18,9 @@
         align-items: flex-start;
         padding: min(5vw, 32px) min(4vw, 28px);
       }
+      body.intro-open {
+        overflow: hidden;
+      }
       .app-shell {
         width: min(720px, 100%);
         margin: 0 auto;
@@ -36,6 +39,115 @@
         display: flex;
         flex-direction: column;
         gap: clamp(14px, 2vw, 22px);
+      }
+      .intro-reminder {
+        margin: 8px 0 16px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+        font-weight: 600;
+        cursor: pointer;
+        align-self: flex-start;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .intro-reminder:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+      }
+      .intro-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(18px, 6vw, 48px);
+        z-index: 1200;
+      }
+      .intro-dialog {
+        width: min(620px, 100%);
+        background: #ffffff;
+        border-radius: 24px;
+        padding: clamp(24px, 5vw, 42px);
+        box-shadow: 0 32px 80px rgba(15, 23, 42, 0.28);
+        display: flex;
+        flex-direction: column;
+        gap: clamp(16px, 3vw, 28px);
+      }
+      .intro-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .intro-emoji {
+        font-size: clamp(2.4rem, 3vw + 1rem, 3.2rem);
+      }
+      .intro-header h2 {
+        margin: 0;
+        font-size: clamp(1.6rem, 2vw + 1.1rem, 2rem);
+        color: #0b3d6b;
+      }
+      .intro-header p {
+        margin: 4px 0 0;
+        color: #4b5563;
+        font-size: clamp(1rem, 1.1vw + 0.85rem, 1.05rem);
+      }
+      .intro-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(14px, 2.4vw, 22px);
+      }
+      .intro-item {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px 16px;
+        align-items: start;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.02));
+        border-radius: 18px;
+        padding: clamp(14px, 2.5vw, 22px);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+      }
+      .intro-item-icon {
+        font-size: clamp(1.6rem, 2vw + 1rem, 1.9rem);
+        line-height: 1;
+      }
+      .intro-item-title {
+        font-weight: 700;
+        color: #1f2937;
+        margin: 0 0 6px;
+        font-size: clamp(1.05rem, 1.2vw + 0.85rem, 1.2rem);
+      }
+      .intro-item-text {
+        margin: 0;
+        color: #374151;
+        font-size: clamp(0.97rem, 1.1vw + 0.8rem, 1.05rem);
+        line-height: 1.55;
+      }
+      .intro-item-text strong {
+        color: #0f172a;
+      }
+      .intro-button {
+        align-self: flex-end;
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-size: clamp(1rem, 1.2vw + 0.85rem, 1.05rem);
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 16px 40px rgba(37, 99, 235, 0.25);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .intro-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 24px 48px rgba(37, 99, 235, 0.28);
       }
       .penalty-overlay {
         position: fixed;
@@ -404,6 +516,7 @@
       <h1 id="titulo">Evaluación</h1>
       <div class="email-tag" id="emailTag"></div>
       <div class="timer" id="timerBox">Tiempo restante: <span id="timerValue">--:--</span></div>
+      <button type="button" class="intro-reminder hidden" id="introReminder">Ver instrucciones iniciales</button>
       <form id="testForm" class="hidden" novalidate>
         <div id="studentBox" class="student-box hidden">
           <label for="studentSelect">Selecciona al estudiante evaluado</label>
@@ -416,6 +529,26 @@
         <button type="submit">Enviar</button>
       </form>
       <div class="status" id="status"></div>
+    </div>
+    <div
+      class="intro-overlay hidden"
+      id="introOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="introTitle"
+      aria-hidden="true"
+    >
+      <div class="intro-dialog">
+        <div class="intro-header">
+          <span class="intro-emoji" aria-hidden="true">📋</span>
+          <div>
+            <h2 id="introTitle">Antes de comenzar</h2>
+            <p id="introSubtitle">Lee estas indicaciones antes de iniciar.</p>
+          </div>
+        </div>
+        <ul class="intro-list" id="introList"></ul>
+        <button type="button" class="intro-button" id="introContinue">Estoy listo para comenzar</button>
+      </div>
     </div>
     <div
       class="penalty-overlay hidden"
@@ -455,6 +588,11 @@
       const penaltyTotal = document.getElementById('penaltyTotal');
       const penaltyWarning = document.getElementById('penaltyWarning');
       const penaltyWarningDefault = penaltyWarning ? penaltyWarning.textContent : '';
+      const introOverlay = document.getElementById('introOverlay');
+      const introList = document.getElementById('introList');
+      const introSubtitle = document.getElementById('introSubtitle');
+      const introContinue = document.getElementById('introContinue');
+      const introReminder = document.getElementById('introReminder');
 
       const sessionStorageKey = quizId ? `quizSession:${quizId}` : '';
       let sesionToken = '';
@@ -463,6 +601,16 @@
           sesionToken = sessionStorage.getItem(sessionStorageKey) || '';
         } catch (err) {
           sesionToken = '';
+        }
+      }
+
+      const introStorageKey = quizId ? `quizIntroShown:${quizId}` : '';
+      let introAlreadySeen = false;
+      if (introStorageKey) {
+        try {
+          introAlreadySeen = sessionStorage.getItem(introStorageKey) === '1';
+        } catch (err) {
+          introAlreadySeen = false;
         }
       }
 
@@ -488,6 +636,7 @@
       let escapeRegistroEnCurso = false;
       let sincronizacionEstadoEnCurso = false;
       let escapeListenersRegistrados = false;
+      let introSections = null;
 
       function configurarSelectorEstudiantes(estudiantes, alumnoPreseleccionado, cursoFiltro) {
         estudiantesDisponibles = Array.isArray(estudiantes) ? estudiantes.slice() : [];
@@ -663,6 +812,8 @@
       } else {
         configurarSelectorEstudiantes(state.estudiantes || [], null, quiz.cursoDestino);
       }
+
+      prepararInstruccionesIniciales(quiz, state);
     }
 
     function showError(err) {
@@ -1391,6 +1542,302 @@
           statusBox.classList.remove('success');
         }
       }
+
+      function prepararInstruccionesIniciales(quiz, state) {
+        const policy = state && state.escapePolicy ? state.escapePolicy : escapePolicy;
+        introSections = construirSeccionesInstrucciones(quiz, policy, state);
+        const hayContenido = Array.isArray(introSections) && introSections.length > 0;
+
+        if (introReminder) {
+          introReminder.classList.toggle('hidden', !hayContenido);
+          if (hayContenido) {
+            introReminder.textContent = introAlreadySeen ? 'Volver a ver las instrucciones' : 'Ver instrucciones iniciales';
+          }
+        }
+
+        if (!hayContenido) {
+          return;
+        }
+
+        if (introSubtitle) {
+          const tituloQuiz = quiz && quiz.titulo ? quiz.titulo : 'Este cuestionario';
+          introSubtitle.textContent = `${tituloQuiz} está configurado con las siguientes indicaciones:`;
+        }
+
+        if (introContinue) {
+          introContinue.textContent = 'Estoy listo para comenzar';
+        }
+
+        if (!introAlreadySeen) {
+          abrirIntroOverlay(false);
+        }
+      }
+
+      function construirSeccionesInstrucciones(quiz, policy, state) {
+        const secciones = [];
+        if (!quiz || typeof quiz !== 'object') {
+          return secciones;
+        }
+
+        const totalPreguntas = Array.isArray(quiz.preguntas) ? quiz.preguntas.length : Array.isArray(preguntasDefinidas) ? preguntasDefinidas.length : 0;
+        const puntajeTotal = typeof quiz.puntajeTotal === 'number' ? quiz.puntajeTotal : null;
+        const duracionMin = typeof quiz.duracionMin === 'number' ? quiz.duracionMin : Number(quiz.duracionMin);
+        const cursoDestino = quiz.cursoDestino ? quiz.cursoDestino.toString().trim() : '';
+
+        if (totalPreguntas > 0 || (puntajeTotal !== null && !isNaN(puntajeTotal))) {
+          const partes = [];
+          if (totalPreguntas > 0) {
+            partes.push(pluralizar(totalPreguntas, '1 pregunta', `${totalPreguntas} preguntas`));
+          }
+          if (puntajeTotal !== null && isFinite(puntajeTotal) && puntajeTotal > 0) {
+            partes.push(`un máximo de ${puntajeTotal} ${puntajeTotal === 1 ? 'punto' : 'puntos'}`);
+          }
+          const resumenContenido = partes.length ? partes.join(' y ') : 'preguntas configuradas';
+          secciones.push({
+            icon: '📝',
+            titulo: 'Contenido del cuestionario',
+            texto: `Responderás ${resumenContenido}. Revisa cada ítem con atención antes de avanzar.`,
+          });
+        }
+
+        if (isFinite(duracionMin) && duracionMin >= 0) {
+          if (duracionMin > 0) {
+            const minutos = Math.max(1, Math.round(duracionMin));
+            secciones.push({
+              icon: '⏱️',
+              titulo: 'Tiempo disponible',
+              texto: `Dispones de ${pluralizar(minutos, '1 minuto', `${minutos} minutos`)} para completar el intento. El envío se realizará con el tiempo que quede disponible.`,
+            });
+          } else {
+            secciones.push({
+              icon: '⏱️',
+              titulo: 'Tiempo disponible',
+              texto: 'Este cuestionario no tiene un límite de tiempo establecido, pero recuerda enviar tus respuestas al finalizar.',
+            });
+          }
+        }
+
+        if (policy && typeof policy === 'object') {
+          const max = isFinite(Number(policy.maxSalidas)) ? Math.max(0, Number(policy.maxSalidas)) : 0;
+          const accion = (policy.accion || '').toString().toUpperCase();
+          let texto = '';
+
+          if (accion === 'PENALIZACION') {
+            const penalizacionTexto = formatearPenalizacion(policy);
+            texto = `Si abandonas la pantalla se aplicará una penalización temporal de ${penalizacionTexto} en la que no podrás contestar.`;
+          } else if (accion === 'BLOQUEO') {
+            texto = 'Abandonar la pantalla bloqueará el intento de manera inmediata.';
+          } else if (accion === 'ADVERTENCIA') {
+            const advertencia = policy.descripcion ? policy.descripcion : 'Se registrará una advertencia en tu intento.';
+            texto = `${advertencia} Evita cambiar de pestaña o minimizar la ventana.`;
+          }
+
+          if (max > 0) {
+            const usadas = typeof state?.salidasRegistradas === 'number'
+              ? Math.max(0, Math.min(max, Math.round(state.salidasRegistradas)))
+              : 0;
+            const restantes = Math.max(0, max - usadas);
+            const limiteTexto = max === 1
+              ? 'Solo se permite una salida antes del bloqueo definitivo.'
+              : `Se permiten hasta ${pluralizar(max, '1 salida', `${max} salidas`)} antes del bloqueo.`;
+            let restantesTexto = 'Mantente en esta pestaña durante todo el examen.';
+            if (usadas > 0 && restantes > 0) {
+              restantesTexto = `Ya registraste ${pluralizar(usadas, '1 salida', `${usadas} salidas`)}; te quedan ${pluralizar(restantes, '1 oportunidad', `${restantes} oportunidades`)}.`;
+            } else if (restantes === 0) {
+              restantesTexto = 'Ya se alcanzó el número máximo de salidas. No abandones la pantalla nuevamente.';
+            }
+            texto += ` ${limiteTexto} ${restantesTexto}`;
+          }
+
+          if (texto) {
+            secciones.push({
+              icon: '🚫',
+              titulo: 'Permanece en la pantalla del examen',
+              texto,
+            });
+          }
+        }
+
+        if (cursoDestino) {
+          secciones.push({
+            icon: '🏫',
+            titulo: 'Curso asignado',
+            texto: `Este cuestionario está destinado al curso ${cursoDestino}. Verifica que estás evaluando al estudiante correcto antes de enviar.`,
+          });
+        }
+
+        const instruccionesPersonalizadas = extraerIndicacionesPersonalizadas(quiz);
+        instruccionesPersonalizadas.forEach(texto => {
+          secciones.push({
+            icon: '💡',
+            titulo: 'Indicaciones del docente',
+            texto,
+          });
+        });
+
+        return secciones;
+      }
+
+      function extraerIndicacionesPersonalizadas(quiz) {
+        const notas = [];
+        if (!quiz) {
+          return notas;
+        }
+
+        const posiblesClaves = ['indicaciones', 'instrucciones', 'notas'];
+        posiblesClaves.forEach(clave => {
+          if (quiz && Object.prototype.hasOwnProperty.call(quiz, clave)) {
+            const valor = quiz[clave];
+            if (Array.isArray(valor)) {
+              valor
+                .map(item => (item == null ? '' : item.toString().trim()))
+                .filter(Boolean)
+                .forEach(texto => notas.push(texto));
+            } else if (valor) {
+              const textoPlano = valor.toString().trim();
+              if (textoPlano) {
+                textoPlano
+                  .split(/\r?\n/)
+                  .map(linea => linea.trim())
+                  .filter(Boolean)
+                  .forEach(texto => notas.push(texto));
+              }
+            }
+          }
+        });
+        if (quiz.escapeConfig && typeof quiz.escapeConfig === 'object' && quiz.escapeConfig.indicaciones) {
+          extraerIndicacionesPersonalizadas({ indicaciones: quiz.escapeConfig.indicaciones }).forEach(texto => notas.push(texto));
+        }
+        return notas;
+      }
+
+      function abrirIntroOverlay(force = false) {
+        if (!introOverlay || !introList) {
+          return;
+        }
+        if (!force && introAlreadySeen) {
+          return;
+        }
+        if (!Array.isArray(introSections) || introSections.length === 0) {
+          return;
+        }
+
+        renderIntroSections();
+        introOverlay.classList.remove('hidden');
+        introOverlay.removeAttribute('aria-hidden');
+        document.body.classList.add('intro-open');
+        if (introContinue) {
+          setTimeout(() => {
+            introContinue.focus();
+          }, 10);
+        }
+      }
+
+      function cerrarIntroOverlay(options = {}) {
+        if (!introOverlay) {
+          return;
+        }
+        introOverlay.classList.add('hidden');
+        introOverlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('intro-open');
+
+        if (options && options.markSeen) {
+          introAlreadySeen = true;
+          if (introStorageKey) {
+            try {
+              sessionStorage.setItem(introStorageKey, '1');
+            } catch (err) {
+              // Ignorar errores de almacenamiento.
+            }
+          }
+        }
+        if (introReminder && !introReminder.classList.contains('hidden')) {
+          introReminder.textContent = 'Volver a ver las instrucciones';
+        }
+      }
+
+      function renderIntroSections() {
+        if (!introList) {
+          return;
+        }
+        if (!Array.isArray(introSections)) {
+          return;
+        }
+        introList.innerHTML = '';
+        introSections.forEach(section => {
+          if (!section || !section.texto) {
+            return;
+          }
+          const li = document.createElement('li');
+          li.className = 'intro-item';
+
+          const icon = document.createElement('span');
+          icon.className = 'intro-item-icon';
+          icon.textContent = section.icon || 'ℹ️';
+          icon.setAttribute('aria-hidden', 'true');
+
+          const content = document.createElement('div');
+          const title = document.createElement('p');
+          title.className = 'intro-item-title';
+          title.textContent = section.titulo || 'Indicaciones';
+
+          const text = document.createElement('p');
+          text.className = 'intro-item-text';
+          text.textContent = section.texto;
+
+          content.appendChild(title);
+          content.appendChild(text);
+
+          li.appendChild(icon);
+          li.appendChild(content);
+          introList.appendChild(li);
+        });
+      }
+
+      function formatearPenalizacion(policy) {
+        if (!policy || typeof policy !== 'object') {
+          return 'una penalización definida por el docente';
+        }
+        if (policy.descripcion) {
+          return policy.descripcion;
+        }
+        const ms = Number(policy.penalizacionMs);
+        if (!isFinite(ms) || ms <= 0) {
+          return 'una penalización temporal';
+        }
+        const segundosTotales = Math.round(ms / 1000);
+        if (segundosTotales < 60) {
+          return pluralizar(segundosTotales, '1 segundo', `${segundosTotales} segundos`);
+        }
+        const minutos = Math.floor(segundosTotales / 60);
+        const segundos = segundosTotales % 60;
+        if (segundos === 0) {
+          return pluralizar(minutos, '1 minuto', `${minutos} minutos`);
+        }
+        return `${pluralizar(minutos, '1 minuto', `${minutos} minutos`)} y ${pluralizar(segundos, '1 segundo', `${segundos} segundos`)}`;
+      }
+
+      function pluralizar(valor, singularTexto, pluralTexto) {
+        const numero = Number(valor);
+        if (!isFinite(numero)) {
+          return pluralTexto;
+        }
+        return Math.abs(numero) === 1 ? singularTexto : pluralTexto;
+      }
+
+      if (introContinue) {
+        introContinue.addEventListener('click', () => cerrarIntroOverlay({ markSeen: true }));
+      }
+
+      if (introReminder) {
+        introReminder.addEventListener('click', () => abrirIntroOverlay(true));
+      }
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && introOverlay && !introOverlay.classList.contains('hidden')) {
+          cerrarIntroOverlay({ markSeen: true });
+        }
+      });
 
       function ejecutarRegistrarRespuestas(datos, timeoutMs = 20000) {
         return new Promise((resolve, reject) => {
