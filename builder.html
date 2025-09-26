@@ -105,6 +105,25 @@
         border-radius: 10px;
         border: 1px solid #e0e3e7;
       }
+      .escape-summary-box {
+        grid-column: 1 / -1;
+        background: #e8f0fe;
+        border-radius: 10px;
+        border: 1px solid #c6dafc;
+        padding: 12px 14px;
+        font-size: 0.9rem;
+        color: #174ea6;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      }
+      .escape-summary-box p {
+        margin: 0;
+      }
+      .escape-summary-box.hidden {
+        display: none !important;
+      }
+      .escape-summary-box strong {
+        font-weight: 600;
+      }
       .block-settings .inline-field {
         gap: 8px;
       }
@@ -452,6 +471,9 @@
             <input type="number" id="escapeMaxInput" min="1" step="1" value="2">
             <small>Incluye la advertencia/penalización inicial.</small>
           </div>
+          <div class="escape-summary-box hidden" id="escapeSummaryBox">
+            <p id="escapeSummary"></p>
+          </div>
         </div>
 
         <div class="questions-area">
@@ -493,6 +515,8 @@
       const escapeValueInput = document.getElementById('escapeValueInput');
       const escapeUnitSelect = document.getElementById('escapeUnitSelect');
       const escapeMaxInput = document.getElementById('escapeMaxInput');
+      const escapeSummaryBox = document.getElementById('escapeSummaryBox');
+      const escapeSummary = document.getElementById('escapeSummary');
 
       document.getElementById('nuevoQuizBtn').addEventListener('click', () => prepararNuevoQuiz());
       document.getElementById('emptyCreateBtn').addEventListener('click', () => prepararNuevoQuiz());
@@ -525,12 +549,14 @@
         }
         const value = parseFloat(event.target.value);
         estado.current.escapeConfig.cantidad = isFinite(value) ? value : 0;
+        actualizarResumenEscape();
       });
       escapeUnitSelect.addEventListener('change', event => {
         if (!estado.current || !estado.current.escapeConfig) {
           return;
         }
         estado.current.escapeConfig.unidad = event.target.value;
+        actualizarResumenEscape();
       });
       escapeMaxInput.addEventListener('input', event => {
         if (!estado.current || !estado.current.escapeConfig) {
@@ -545,6 +571,7 @@
         }
         estado.current.escapeConfig.maxSalidas = value;
         escapeMaxInput.value = value;
+        actualizarResumenEscape();
       });
 
       function init() {
@@ -1757,6 +1784,101 @@
         if (estado.current) {
           estado.current.escapeConfig.unidad = escapeUnitSelect.value;
         }
+        actualizarResumenEscape();
+      }
+
+      function actualizarResumenEscape() {
+        if (!escapeSummaryBox || !escapeSummary) {
+          return;
+        }
+        const cfg = obtenerEscapeConfigActual();
+        const resumen = obtenerResumenEscape(cfg);
+        if (resumen) {
+          escapeSummary.textContent = resumen;
+          escapeSummaryBox.classList.remove('hidden');
+        } else {
+          escapeSummary.textContent = '';
+          escapeSummaryBox.classList.add('hidden');
+        }
+      }
+
+      function obtenerEscapeConfigActual() {
+        if (estado.current && estado.current.escapeConfig) {
+          return mapEscapeConfigFromServer(estado.current.escapeConfig);
+        }
+        return defaultEscapeConfig();
+      }
+
+      function obtenerResumenEscape(cfg) {
+        if (!cfg || typeof cfg !== 'object') {
+          return '';
+        }
+        const partes = [];
+        const accion = cfg.accion || 'PENALIZACION';
+        if (accion === 'BLOQUEO') {
+          partes.push('El intento se bloqueará inmediatamente al abandonar la pantalla.');
+        } else if (accion === 'ADVERTENCIA') {
+          partes.push('Cada salida registrará una advertencia sin penalización de tiempo.');
+        } else {
+          const penalizacion = formatearPenalizacionDesdeConfig(cfg);
+          partes.push(`Cada salida aplicará una penalización temporal de ${penalizacion}.`);
+        }
+
+        if (cfg.maxSalidas && cfg.maxSalidas > 0) {
+          const max = Math.round(cfg.maxSalidas);
+          const limiteTexto = max === 1
+            ? 'Solo se permite una salida antes del bloqueo definitivo.'
+            : `Se permiten hasta ${pluralizar(max, '1 salida', `${max} salidas`)} antes del bloqueo.`;
+          partes.push(limiteTexto);
+        }
+
+        return partes.join(' ');
+      }
+
+      function formatearPenalizacionDesdeConfig(cfg) {
+        if (!cfg || cfg.accion !== 'PENALIZACION') {
+          return 'la penalización configurada por el docente';
+        }
+        const cantidad = Number(cfg.cantidad);
+        if (!isFinite(cantidad) || cantidad <= 0) {
+          return 'la penalización configurada por el docente';
+        }
+        switch (cfg.unidad) {
+          case 'PORCENTAJE':
+            return `${formatearCantidad(cantidad)}% del tiempo total`;
+          case 'MINUTOS':
+            if (Math.abs(cantidad % 1) < 1e-6) {
+              const minutos = Math.round(cantidad);
+              return pluralizar(minutos, '1 minuto', `${minutos} minutos`);
+            }
+            return `${formatearCantidad(cantidad)} minutos`;
+          case 'SEGUNDOS':
+            if (Math.abs(cantidad % 1) < 1e-6) {
+              const segundos = Math.round(cantidad);
+              return pluralizar(segundos, '1 segundo', `${segundos} segundos`);
+            }
+            return `${formatearCantidad(cantidad)} segundos`;
+          default:
+            return 'la penalización configurada por el docente';
+        }
+      }
+
+      function formatearCantidad(valor) {
+        if (!isFinite(valor)) {
+          return '';
+        }
+        if (Math.abs(valor % 1) < 1e-6) {
+          return `${Math.round(valor)}`;
+        }
+        return valor.toFixed(2).replace(/\.0+$/, '').replace(/\.$/, '').replace('.', ',');
+      }
+
+      function pluralizar(valor, singular, plural) {
+        const numero = Number(valor);
+        if (!isFinite(numero)) {
+          return plural;
+        }
+        return numero === 1 ? singular : plural;
       }
 
       function mostrarStatus(mensaje, tipo) {

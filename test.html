@@ -1186,8 +1186,9 @@
       }
 
       function calcularPenalizacionPorDefecto(referenciaMs) {
-        // Usar el 10% del tiempo total como penalización base, mínimo 30 segundos
-        const base = referenciaMs && referenciaMs > 0 ? referenciaMs : 60000;
+        // Usar el 10% del tiempo total como penalización base, mínimo 30 segundos.
+        // Si no hay referencia disponible, asumimos un examen de 10 minutos (como en el servidor).
+        const base = referenciaMs && referenciaMs > 0 ? referenciaMs : 10 * 60 * 1000;
         return Math.max(30000, Math.round(base * 0.1));
       }
 
@@ -1206,7 +1207,7 @@
         if (baseAccion === 'PENALIZACION') {
           const parsed = parseEscapeValor(rawConfig && rawConfig.valor);
           if (parsed.unidad === 'PORCENTAJE') {
-            const referencia = referenciaMs && referenciaMs > 0 ? referenciaMs : 60000;
+            const referencia = referenciaMs && referenciaMs > 0 ? referenciaMs : 10 * 60 * 1000;
             penalizacionMs = Math.max(1000, Math.round(referencia * (parsed.cantidad / 100)));
             descripcion = `${parsed.cantidad}% del tiempo total`;
           } else if (parsed.unidad === 'MINUTOS') {
